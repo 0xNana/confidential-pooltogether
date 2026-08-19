@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ArrowLeft, CircleDot, ExternalLink, FileCheck2, Github, LockKeyhole } from "lucide-react"
+import { ArrowLeft, ExternalLink, FileCheck2, Github } from "lucide-react"
 import { ActivityFeed } from "../components/ActivityFeed"
 import { BrandMark } from "../components/BrandMark"
 import { DrawStatus } from "../components/DrawStatus"
@@ -36,13 +36,6 @@ export default function VaultApp() {
       </header>
 
       <main className="vault-main">
-        <header className="vault-intro dashboard-intro">
-          <div>
-            <p className="eyebrow"><CircleDot size={13} /> Draw #{String(model.poolState.drawId).padStart(3, "0")} · {model.loading ? "syncing" : model.poolState.phaseLabel}</p>
-          </div>
-          <div className="dashboard-privacy-status"><LockKeyhole size={20} /><span><small>Privacy is active</small><strong>Financial values remain ciphertext onchain</strong></span></div>
-        </header>
-
         {model.readError && <div className="read-error" role="alert"><strong>Sepolia read degraded.</strong><span>{model.readError}</span><button type="button" onClick={() => void model.refresh()}>Retry</button></div>}
 
         <DrawStatus poolState={model.poolState} loading={model.loading} />

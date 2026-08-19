@@ -87,11 +87,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .status-text.ready { color: #087064; }
 .status-text.error { color: var(--danger); }
 
-.vault-main { width: min(100% - 48px, 1440px); margin: 0 auto; padding-bottom: 84px; }
-.vault-intro { display: grid; grid-template-columns: 1fr minmax(330px, .7fr); gap: 40px; align-items: end; padding: 52px 0 34px; }
-.dashboard-privacy-status { display: flex; justify-self: end; align-items: center; gap: 12px; max-width: 380px; padding: 15px 17px; border: 1px solid #97bdb5; border-radius: 6px; background: var(--aqua-soft); color: #075e56; }
-.dashboard-privacy-status small { display: block; font-size: 11px; font-weight: 760; text-transform: uppercase; }
-.dashboard-privacy-status strong { display: block; margin-top: 4px; font-size: 12px; line-height: 1.35; }
+.vault-main { width: min(100% - 48px, 1440px); margin: 0 auto; padding: 34px 0 84px; }
 .read-error { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; margin-bottom: 18px; padding: 13px 16px; border: 1px solid var(--danger); border-radius: 4px; background: var(--danger-soft); color: var(--danger); font-size: 12px; }
 .read-error button { border: 0; border-bottom: 1px solid currentColor; background: transparent; color: inherit; font-weight: 720; }
 
@@ -165,9 +161,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .action-primary:hover:not(:disabled) { background: var(--lime-strong); color: var(--ink); }
 .action-primary:disabled { border-color: #46483f; background: #30322c; color: #8f9288; }
 .button-loader { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
-.assurance-row { display: flex; justify-content: center; gap: 22px; margin-top: 14px; color: #9da096; }
-.assurance-row span { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; }
-
 /* Position */
 .position-gate { display: grid; grid-template-columns: auto 1fr auto; gap: 17px; align-items: center; min-height: 166px; padding: 30px 24px; }
 .gate-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 5px; background: var(--coral-soft); color: var(--danger); }
@@ -400,8 +393,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .main-nav, .landing-nav > nav { display: none; }
   .vault-mobile-proof { display: grid; }
   .vault-main { width: min(100% - 36px, 760px); }
-  .vault-intro { grid-template-columns: 1fr; gap: 24px; padding-top: 42px; }
-  .dashboard-privacy-status { justify-self: start; }
   .draw-console { grid-template-columns: 150px 1fr 1fr; }
   .draw-console > div { min-height: 82px; border-bottom: 1px solid var(--line); }
   .draw-console > div:nth-last-child(-n+3) { border-bottom: 0; }
@@ -435,8 +426,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .vault-header .wallet-trigger { min-width: 122px; padding-inline: 12px; }
   .landing-launch { min-height: 40px; padding-inline: 12px; }
   .vault-main { width: min(100% - 28px, 560px); }
-  .vault-intro { padding: 34px 0 26px; }
-  .dashboard-privacy-status { width: 100%; max-width: none; }
   .draw-console { grid-template-columns: 1fr 1fr; }
   .draw-console-id, .draw-console-phase { grid-column: 1 / -1; }
   .draw-console > div, .draw-console > div:nth-last-child(-n+3) { min-height: 74px; padding: 14px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
@@ -456,8 +445,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .amount-entry input { font-size: 36px; }
   .amount-toolbar { flex-wrap: wrap; }
   .amount-toolbar > span { width: 100%; margin: 4px 0 0; }
-  .assurance-row { gap: 10px; }
-  .assurance-row span:last-child { display: none; }
   .panel-titlebar { align-items: flex-start; padding: 19px; }
   .panel-titlebar h2 { font-size: 25px; }
   .security-badge { padding-inline: 8px; }

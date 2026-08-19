@@ -1,4 +1,4 @@
-import { ArrowDownToLine, ArrowRight, ArrowUpRight, Check, Clock3, KeyRound, LockKeyhole, ShieldCheck } from "lucide-react"
+import { ArrowDownToLine, ArrowRight, ArrowUpRight, Check, KeyRound } from "lucide-react"
 import { FormEvent, useMemo, useState } from "react"
 import type { ConfidentialPoolTogetherModel } from "../hooks/useConfidentialPoolTogether"
 import { validateActionAmount } from "../lib/action-validation"
@@ -78,7 +78,6 @@ export function VaultAction(props: VaultActionProps) {
           {actionBusy && props.operation.kind === mode ? props.operation.title : disabledReason ?? (mode === "deposit" ? "Encrypt & deposit" : "Encrypt & withdraw")}
           {actionBusy ? <span className="button-loader" /> : <ArrowRight size={17} />}
         </button>
-        <div className="assurance-row"><span><ShieldCheck size={13} /> ERC-7984</span><span><LockKeyhole size={13} /> Client-side FHE</span><span><Clock3 size={13} /> Withdraw anytime</span></div>
       </form>
     </section>
   )
