@@ -46,14 +46,15 @@ await page.screenshot({ path: "/tmp/confidential-pooltogether-landing-desktop.pn
 
 await page.click('[data-testid="launch-app"]')
 await page.waitForFunction(() => window.location.pathname === "/app", { timeout: 10_000 })
-await page.waitForSelector('[data-testid="live-draw"]')
+await page.waitForSelector('[data-testid="shell-overview"]')
 await page.waitForSelector('[data-testid="connect-wallet"]')
+await page.click('[data-testid="shell-manage"]')
+await page.waitForSelector('[data-testid="live-draw"]')
 await page.waitForFunction(() => {
   const value = document.querySelector(".draw-console-id strong")?.textContent
   return Boolean((value && value !== "Syncing" && value !== "#000") || document.querySelector(".read-error"))
 }, { timeout: 60_000 })
 
-await page.click('[data-testid="shell-manage"]')
 await page.waitForSelector('[data-testid="submit-action"]')
 
 const appText = await page.evaluate(() => document.body.textContent ?? "")
@@ -81,6 +82,8 @@ const mobileLandingOverflow = await mobilePage.evaluate(() => document.documentE
 if (mobileLandingOverflow) throw new Error("Landing page has horizontal overflow at 390px")
 await mobilePage.screenshot({ path: "/tmp/confidential-pooltogether-landing-mobile.png", fullPage: true })
 await mobilePage.click('[data-testid="launch-app"]')
+await mobilePage.waitForSelector('[data-testid="shell-manage"]')
+await mobilePage.click('[data-testid="shell-manage"]')
 await mobilePage.waitForSelector('[data-testid="live-draw"]')
 await mobilePage.waitForFunction(() => document.querySelector(".draw-console-id strong")?.textContent !== "Syncing" || document.querySelector(".read-error"), { timeout: 60_000 })
 const mobileVaultOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
@@ -96,6 +99,8 @@ await narrowPage.waitForSelector('[data-testid="launch-app"]')
 const narrowLandingOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 if (narrowLandingOverflow) throw new Error("Landing page has horizontal overflow at 320px")
 await narrowPage.goto(`${baseUrl}/app`, { waitUntil: "domcontentloaded", timeout: 30_000 })
+await narrowPage.waitForSelector('[data-testid="shell-manage"]')
+await narrowPage.click('[data-testid="shell-manage"]')
 await narrowPage.waitForSelector('[data-testid="live-draw"]')
 const narrowVaultOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 if (narrowVaultOverflow) throw new Error("Vault has horizontal overflow at 320px")

@@ -1,10 +1,10 @@
-import { Eye, Fingerprint, KeyRound, LockKeyhole, ShieldCheck, Wallet, Zap } from "lucide-react"
+import { Eye, Fingerprint, KeyRound, LockKeyhole, ShieldCheck, Wallet } from "lucide-react"
 import type { ConfidentialPoolTogetherModel } from "../hooks/useConfidentialPoolTogether"
 import { formatTokenAmount } from "../lib/fhevm"
 
 type PositionCardProps = Pick<
   ConfidentialPoolTogetherModel,
-  "account" | "correctChain" | "permitReady" | "principal" | "walletBalance" | "operation" | "connect" | "switchNetwork" | "authorizeReads" | "revealPosition" | "fundTestnet"
+  "account" | "correctChain" | "permitReady" | "principal" | "walletBalance" | "operation" | "connect" | "switchNetwork" | "authorizeReads" | "revealPosition"
 >
 
 export function PositionCard(props: PositionCardProps) {
@@ -59,10 +59,6 @@ export function PositionCard(props: PositionCardProps) {
           ) : (
             <div className="local-reveal-note"><ShieldCheck size={14} /> Values decrypted locally through the Zama KMS threshold network.</div>
           )}
-          <div className="testnet-funding">
-            <div><Zap size={15} /><span><strong>Official Sepolia cUSDT</strong><small>Mint the public test token, then shield it through Zama's deployed wrapper.</small></span></div>
-            <button className="text-button" type="button" onClick={() => void props.fundTestnet()} disabled={props.operation.kind === "fund" && ["signature", "pending"].includes(props.operation.stage)}>Get 1,000 cUSDT <span aria-hidden="true">↗</span></button>
-          </div>
         </>
       )}
     </section>

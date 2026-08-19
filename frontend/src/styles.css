@@ -100,6 +100,13 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .sidebar-nav button.active { border-color: var(--ink); background: var(--ink); color: white; }
 .sidebar-nav button.active small { color: #b8bbb0; }
 .sidebar-nav button.active > svg { color: var(--lime); }
+.sidebar-faucet { display: grid; gap: 12px; margin-top: 22px; padding: 14px 12px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface-low); }
+.sidebar-faucet > div { display: flex; align-items: center; gap: 9px; }
+.sidebar-faucet > div > svg { color: var(--danger); }
+.sidebar-faucet strong, .sidebar-faucet small { display: block; }
+.sidebar-faucet strong { font-size: 11px; }
+.sidebar-faucet small { margin-top: 3px; color: var(--muted); font-size: 10px; }
+.sidebar-faucet .text-button { justify-content: flex-start; }
 .sidebar-footnote { display: flex; align-items: center; gap: 9px; margin: auto 12px 0; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; line-height: 1.45; text-transform: uppercase; }
 .sidebar-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: #087064; box-shadow: 0 0 0 4px var(--aqua-soft); }
 .vault-main { width: min(100% - 64px, 1240px); margin: 0 auto; padding: 34px 0 84px; }
@@ -204,13 +211,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .permit-callout strong { display: block; font-size: 12px; }
 .permit-callout p { margin: 4px 0 0; font-size: 11px; line-height: 1.45; }
 .local-reveal-note { display: flex; align-items: center; gap: 7px; min-height: 48px; padding: 0 20px; border-top: 1px solid var(--line); background: var(--aqua-soft); color: #075e56; font-size: 11px; }
-.testnet-funding { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 66px; padding: 11px 20px; border-top: 1px solid var(--line); background: var(--surface-low); }
-.testnet-funding > div { display: flex; align-items: center; gap: 10px; }
-.testnet-funding > div > svg { color: var(--danger); }
-.testnet-funding strong { display: block; font-size: 11px; }
-.testnet-funding small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
-.testnet-funding .text-button:disabled { opacity: .5; }
-
 /* Prize and activity */
 .prize-card { position: relative; overflow: hidden; min-height: 465px; padding: 25px; border: 1px solid var(--ink); border-radius: 6px; background: var(--ink); color: white; }
 .prize-card::after { content: ""; position: absolute; top: -80px; right: -70px; width: 190px; height: 190px; border: 1px solid #42453b; border-radius: 50%; }
@@ -416,6 +416,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .vault-shell-layout { grid-template-columns: 1fr; }
   .vault-sidebar { position: static; min-height: 0; padding: 15px 18px 0; border-right: 0; border-bottom: 1px solid var(--line); }
   .sidebar-heading, .sidebar-footnote { display: none; }
+  .sidebar-faucet { grid-template-columns: 1fr auto; align-items: center; margin: 12px 0 0; padding: 10px 12px; }
   .sidebar-nav { display: flex; gap: 5px; padding: 0; overflow-x: auto; }
   .sidebar-nav button { flex: 1 0 180px; min-height: 54px; }
   .sidebar-nav button small { display: none; }
@@ -486,7 +487,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .ledger-value:last-child { border-bottom: 0; }
   .permit-callout { grid-template-columns: auto 1fr; }
   .permit-callout .button { grid-column: 1 / -1; width: 100%; }
-  .testnet-funding { align-items: flex-start; flex-direction: column; }
   .workspace-rail { display: flex; }
   .prize-card { min-height: 440px; }
   .site-footer { grid-template-columns: 1fr; justify-items: start; gap: 18px; padding: 28px 18px; }

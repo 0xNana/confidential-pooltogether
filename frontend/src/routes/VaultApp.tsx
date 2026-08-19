@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Activity, ArrowLeft, ExternalLink, FileCheck2, Github, LayoutDashboard, WalletCards } from "lucide-react"
+import { Activity, ArrowLeft, ExternalLink, FileCheck2, Github, LayoutDashboard, WalletCards, Zap } from "lucide-react"
 import { ActivityFeed } from "../components/ActivityFeed"
 import { BrandMark } from "../components/BrandMark"
 import { DrawStatus } from "../components/DrawStatus"
@@ -50,13 +50,17 @@ export default function VaultApp() {
             <button type="button" className={activeView === "manage" ? "active" : ""} onClick={() => setActiveView("manage")} aria-current={activeView === "manage" ? "page" : undefined} data-testid="shell-manage"><WalletCards size={16} /><span>Manage position</span><small>Deposit or withdraw</small></button>
             <button type="button" className={activeView === "activity" ? "active" : ""} onClick={() => setActiveView("activity")} aria-current={activeView === "activity" ? "page" : undefined} data-testid="shell-activity"><Activity size={16} /><span>Activity</span><small>Public contract events</small></button>
           </nav>
+          <div className="sidebar-faucet">
+            <div><Zap size={15} /><span><strong>Sepolia cUSDT</strong><small>Official testnet faucet</small></span></div>
+            <button className="text-button" type="button" onClick={() => void model.fundTestnet()} disabled={model.operation.kind === "fund" && ["signature", "pending"].includes(model.operation.stage)} data-testid="shell-faucet">Get 1,000 cUSDT <span aria-hidden="true">↗</span></button>
+          </div>
           <div className="sidebar-footnote"><span className="sidebar-dot" /> <span>Sepolia pool<br />Live contract state</span></div>
         </aside>
 
         <main className="vault-main">
           {model.readError && <div className="read-error" role="alert"><strong>Sepolia read degraded.</strong><span>{model.readError}</span><button type="button" onClick={() => void model.refresh()}>Retry</button></div>}
 
-          <DrawStatus poolState={model.poolState} loading={model.loading} />
+          {activeView !== "overview" && <DrawStatus poolState={model.poolState} loading={model.loading} />}
 
           <div className="workspace-heading">
             <div>
