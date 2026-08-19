@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ArrowLeft, ArrowUpRight, CircleDot, ExternalLink, FileCheck2, Github, LockKeyhole } from "lucide-react"
+import { ArrowLeft, CircleDot, ExternalLink, FileCheck2, Github, LockKeyhole } from "lucide-react"
 import { ActivityFeed } from "../components/ActivityFeed"
 import { BrandMark } from "../components/BrandMark"
 import { DrawStatus } from "../components/DrawStatus"
@@ -19,11 +19,6 @@ export default function VaultApp() {
   return (
     <div className="app-shell vault-shell">
       <a className="skip-link" href="#workspace">Skip to vault workspace</a>
-      <div className="protocol-strip">
-        <span><i /> Live on Sepolia</span>
-        <span>Balances, odds, winner and prize stay encrypted</span>
-        <a href={`https://sepolia.etherscan.io/address/${POOL_ADDRESS}#code`} target="_blank" rel="noreferrer">Verified contract <ArrowUpRight size={12} /></a>
-      </div>
 
       <header className="site-header vault-header">
         <a className="brand" href="/" aria-label="Confidential PoolTogether home">

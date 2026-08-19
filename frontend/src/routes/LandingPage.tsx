@@ -31,12 +31,6 @@ export function LandingPage() {
     <div className="landing-shell">
       <a className="skip-link" href="#landing-content">Skip to main content</a>
 
-      <div className="landing-statusbar">
-        <span><i /> Live on Ethereum Sepolia</span>
-        <span>Encrypted prize savings powered by Zama FHEVM</span>
-        <a href={`https://sepolia.etherscan.io/address/${POOL_ADDRESS}#code`} target="_blank" rel="noreferrer">Verified contract <ArrowUpRight size={13} /></a>
-      </div>
-
       <header className="landing-nav">
         <a className="brand" href="#top" aria-label="Confidential PoolTogether home">
           <BrandMark />

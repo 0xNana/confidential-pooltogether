@@ -54,8 +54,8 @@ await page.waitForFunction(() => {
 }, { timeout: 60_000 })
 
 const appText = await page.evaluate(() => document.body.textContent ?? "")
-if (!appText.includes("Live on Sepolia")) throw new Error("Live deployment status is missing from app")
 if (!appText.includes("Your private") || !appText.includes("prize account")) throw new Error("Primary vault heading is missing")
+if (!appText.includes("Privacy is active")) throw new Error("Vault privacy status is missing")
 if (appText.includes("Demo wallet") || appText.includes("6,240.18")) throw new Error("Simulated wallet or prize data is still rendered")
 const appOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 if (appOverflow) throw new Error("Vault has horizontal overflow at 1440px")
