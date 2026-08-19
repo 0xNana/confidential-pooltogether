@@ -83,7 +83,6 @@ export function LandingPage() {
           <div className="landing-section-label light"><span>02</span><p>One path from savings to prize</p></div>
           <div className="landing-section-heading">
             <h2 id="lifecycle-title">Four public steps.<br />Zero public balances.</h2>
-            <p>Every state shown in the vault comes from the deployed contract. No simulated odds, hardcoded prizes, or frontend-only winner flags.</p>
           </div>
           <ol className="landing-steps">
             {DRAW_STEPS.map((step) => (

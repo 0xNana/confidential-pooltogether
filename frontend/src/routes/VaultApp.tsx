@@ -39,8 +39,6 @@ export default function VaultApp() {
         <header className="vault-intro dashboard-intro">
           <div>
             <p className="eyebrow"><CircleDot size={13} /> Draw #{String(model.poolState.drawId).padStart(3, "0")} · {model.loading ? "syncing" : model.poolState.phaseLabel}</p>
-            <h1>Your private<br />prize account.</h1>
-            <p>Deposit confidential cUSDT, keep control of your principal, and compete for yield without publishing your balance.</p>
           </div>
           <div className="dashboard-privacy-status"><LockKeyhole size={20} /><span><small>Privacy is active</small><strong>Financial values remain ciphertext onchain</strong></span></div>
         </header>
@@ -63,7 +61,6 @@ export default function VaultApp() {
 
       <footer className="site-footer vault-footer">
         <a className="brand footer-brand" href="/"><BrandMark /><span><strong>Confidential PoolTogether</strong><small>Save quietly. Win verifiably.</small></span></a>
-        <p>Live Zama FHEVM integration · Sepolia testnet · Not yet audited</p>
         <div className="footer-links">
           <a href={`https://sepolia.etherscan.io/address/${POOL_ADDRESS}`} target="_blank" rel="noreferrer"><ExternalLink size={13} /> Etherscan</a>
           <a href="https://github.com/zama-ai/fhevm" target="_blank" rel="noreferrer"><Github size={13} /> FHEVM</a>

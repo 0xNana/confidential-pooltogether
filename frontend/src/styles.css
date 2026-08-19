@@ -89,8 +89,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 
 .vault-main { width: min(100% - 48px, 1440px); margin: 0 auto; padding-bottom: 84px; }
 .vault-intro { display: grid; grid-template-columns: 1fr minmax(330px, .7fr); gap: 40px; align-items: end; padding: 52px 0 34px; }
-.vault-intro h1 { max-width: 780px; margin: 12px 0 0; font-family: "Newsreader Variable", Georgia, serif; font-size: 62px; line-height: .9; font-weight: 560; letter-spacing: 0; }
-.vault-intro > div:first-child > p:last-child { max-width: 610px; margin: 20px 0 0; color: var(--muted); font-size: 15px; line-height: 1.55; }
 .dashboard-privacy-status { display: flex; justify-self: end; align-items: center; gap: 12px; max-width: 380px; padding: 15px 17px; border: 1px solid #97bdb5; border-radius: 6px; background: var(--aqua-soft); color: #075e56; }
 .dashboard-privacy-status small { display: block; font-size: 11px; font-weight: 760; text-transform: uppercase; }
 .dashboard-privacy-status strong { display: block; margin-top: 4px; font-size: 12px; line-height: 1.35; }
@@ -290,8 +288,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .app-loading { display: grid; place-items: center; align-content: center; gap: 20px; min-height: 100svh; background: var(--ink); color: white; }
 .app-loading p { margin: 0; color: #c2c5ba; font-size: 11px; font-weight: 720; text-transform: uppercase; }
 .app-loading-mark { width: 38px; height: 38px; border: 7px solid var(--lime); border-right-color: var(--coral); border-radius: 50%; animation: spin 1s linear infinite; }
-.site-footer { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; min-height: 118px; padding: 24px max(24px, calc((100% - 1440px) / 2)); border-top: 1px solid var(--line); background: var(--surface); }
-.site-footer > p { color: var(--muted); font-size: 11px; text-align: center; }
+.site-footer { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 24px; min-height: 118px; padding: 24px max(24px, calc((100% - 1440px) / 2)); border-top: 1px solid var(--line); background: var(--surface); }
 .footer-links { display: flex; justify-self: end; gap: 18px; }
 .footer-links a { display: inline-flex; align-items: center; gap: 5px; color: var(--ink); font-size: 11px; font-weight: 700; text-decoration: none; }
 
@@ -439,8 +436,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .landing-launch { min-height: 40px; padding-inline: 12px; }
   .vault-main { width: min(100% - 28px, 560px); }
   .vault-intro { padding: 34px 0 26px; }
-  .vault-intro h1 { font-size: 48px; }
-  .vault-intro > div:first-child > p:last-child { font-size: 13px; }
   .dashboard-privacy-status { width: 100%; max-width: none; }
   .draw-console { grid-template-columns: 1fr 1fr; }
   .draw-console-id, .draw-console-phase { grid-column: 1 / -1; }
@@ -477,7 +472,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .workspace-rail { display: flex; }
   .prize-card { min-height: 440px; }
   .site-footer { grid-template-columns: 1fr; justify-items: start; gap: 18px; padding: 28px 18px; }
-  .site-footer > p { text-align: left; }
   .footer-links { justify-self: start; }
   .landing-hero { min-height: calc(100svh - 128px); max-height: none; }
   .landing-hero-copy { width: min(100% - 36px, 560px); min-height: calc(100svh - 128px); max-height: none; padding: 44px 0 174px; }
