@@ -51,8 +51,6 @@ export function LandingPage() {
 
       <main id="landing-content">
         <section className="landing-hero" id="top" aria-labelledby="landing-title">
-          <div className="landing-hero-media" role="img" aria-label="Confidential PoolTogether live vault dashboard" />
-          <div className="landing-hero-shade" />
           <div className="landing-hero-copy">
             <p className="eyebrow"><LockKeyhole size={14} /> Private prize savings · Live on Sepolia</p>
             <h1 id="landing-title"><span>Confidential</span><em>PoolTogether</em></h1>
@@ -64,7 +62,6 @@ export function LandingPage() {
             </div>
             <p className="landing-hero-note"><ShieldCheck size={15} /><span><strong>No-loss prize design</strong>Your deposited principal is never awarded.</span></p>
           </div>
-          <div className="landing-hero-caption" aria-hidden="true"><span>Actual vault interface</span><strong>Draw #001 · Open</strong><small>Backed by the deployed Sepolia contract</small></div>
           <div className="landing-hero-proof" aria-label="Protocol assurances">
             <span><WalletCards size={16} /><strong>Principal stays yours</strong><small>Withdraw while the pool is open</small></span>
             <span><LockKeyhole size={16} /><strong>Financial values stay sealed</strong><small>Encrypted before submission</small></span>
