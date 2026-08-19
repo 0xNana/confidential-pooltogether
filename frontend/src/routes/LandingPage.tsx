@@ -1,5 +1,4 @@
 import {
-  ArrowDown,
   ArrowRight,
   ArrowUpRight,
   Check,
@@ -11,7 +10,6 @@ import {
   LockKeyhole,
   ScanLine,
   ShieldCheck,
-  Sparkles,
   TicketCheck,
   WalletCards,
 } from "lucide-react"
@@ -56,19 +54,21 @@ export function LandingPage() {
           <div className="landing-hero-media" role="img" aria-label="Confidential PoolTogether live vault dashboard" />
           <div className="landing-hero-shade" />
           <div className="landing-hero-copy">
-            <p className="eyebrow"><Sparkles size={14} /> The no-loss prize account, now confidential</p>
-            <h1 id="landing-title">Confidential<br />PoolTogether</h1>
-            <p className="landing-hero-statement">Save privately.<br /><em>Win verifiably.</em></p>
-            <p className="landing-lede">Your principal stays yours. Your balance, odds, and prize stay encrypted. Every draw still settles onchain.</p>
+            <p className="eyebrow"><LockKeyhole size={14} /> Private prize savings · Live on Sepolia</p>
+            <h1 id="landing-title"><span>Confidential</span><em>PoolTogether</em></h1>
+            <p className="landing-hero-statement">Your savings enter the draw.<br />Your balance stays out of public view.</p>
+            <p className="landing-lede">Deposit cUSDT, stay liquid, and compete for yield while FHE keeps positions, odds, winners, and prizes encrypted.</p>
             <div className="landing-actions">
-              <a className="button button-lime landing-primary-cta" href="/app" data-testid="launch-app">Enter the live vault <ArrowRight size={17} /></a>
-              <a className="landing-text-link" href="#how-it-works">See how privacy works <ArrowDown size={15} /></a>
+              <a className="button button-lime landing-primary-cta" href="/app" data-testid="launch-app">Start saving privately <ArrowRight size={17} /></a>
+              <a className="landing-text-link" href={`https://sepolia.etherscan.io/address/${POOL_ADDRESS}#code`} target="_blank" rel="noreferrer">Verify the live contract <ArrowUpRight size={15} /></a>
             </div>
+            <p className="landing-hero-note"><ShieldCheck size={15} /><span><strong>No-loss prize design</strong>Your deposited principal is never awarded.</span></p>
           </div>
+          <div className="landing-hero-caption" aria-hidden="true"><span>Actual vault interface</span><strong>Draw #001 · Open</strong><small>Backed by the deployed Sepolia contract</small></div>
           <div className="landing-hero-proof" aria-label="Protocol assurances">
-            <span><ShieldCheck size={16} /><strong>Live contract</strong><small>Verified on Sepolia</small></span>
-            <span><LockKeyhole size={16} /><strong>Encrypted balances</strong><small>Client-side FHE</small></span>
-            <span><EyeOff size={16} /><strong>Private results</strong><small>Wallet-only decryption</small></span>
+            <span><WalletCards size={16} /><strong>Principal stays yours</strong><small>Withdraw while the pool is open</small></span>
+            <span><LockKeyhole size={16} /><strong>Financial values stay sealed</strong><small>Encrypted before submission</small></span>
+            <span><ShieldCheck size={16} /><strong>Every draw stays auditable</strong><small>Verified contract execution</small></span>
           </div>
         </section>
 

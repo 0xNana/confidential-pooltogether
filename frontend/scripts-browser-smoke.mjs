@@ -32,7 +32,7 @@ await page.goto(`${baseUrl}/`, { waitUntil: "networkidle2", timeout: 30_000 })
 await page.waitForSelector('[data-testid="launch-app"]')
 
 const landingText = await page.evaluate(() => document.body.textContent ?? "")
-if (!landingText.includes("Save privately") || !landingText.includes("Encrypted balances")) {
+if (!landingText.includes("Your savings enter the draw") || !landingText.includes("Principal stays yours")) {
   throw new Error("Landing page product and deployment messaging is missing")
 }
 const landingOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
