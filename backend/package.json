@@ -1,0 +1,16 @@
+{
+  "name": "@confidential-pooltogether/backend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "index": "node --env-file-if-exists=../.env.local index-events.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.1",
+    "ethers": "^6.16.0"
+  },
+  "devDependencies": {
+    "supabase": "^2.111.0"
+  }
+}

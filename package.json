@@ -1,0 +1,35 @@
+{
+  "name": "confidential-pooltogether",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "frontend",
+    "contracts",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w frontend",
+    "preview": "npm run preview -w frontend",
+    "build": "npm run build -w frontend",
+    "browser:smoke": "npm run browser:smoke -w frontend",
+    "contracts:compile": "npm run compile -w contracts",
+    "contracts:check-deployer": "npm run check-deployer -w contracts",
+    "contracts:deploy": "npm run deploy -w contracts",
+    "contracts:test": "npm run test -w contracts",
+    "contracts:verify-deployment": "npm run verify-deployment -w contracts",
+    "contracts:verify-source": "npm run verify-source -w contracts",
+    "events:index": "npm run index -w backend",
+    "lint": "eslint .",
+    "test": "npm run test -w frontend"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "globals": "^15.14.0",
+    "typescript": "~5.7.2",
+    "typescript-eslint": "^8.18.2"
+  }
+}
