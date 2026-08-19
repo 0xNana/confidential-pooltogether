@@ -40,10 +40,18 @@ export default function VaultApp() {
 
         <DrawStatus poolState={model.poolState} loading={model.loading} />
 
+        <div className="workspace-heading">
+          <div>
+            <p className="eyebrow">Private pool workspace</p>
+            <h1>Your vault</h1>
+          </div>
+          <p>Review your account, manage your position, and check the current draw result.</p>
+        </div>
+
         <section className="workspace" id="workspace" aria-label="Confidential PoolTogether vault workspace">
           <div className="workspace-main">
-            <VaultAction {...model} />
             <PositionCard {...model} />
+            <VaultAction {...model} />
           </div>
           <aside className="workspace-rail">
             <PrizeCard {...model} />
