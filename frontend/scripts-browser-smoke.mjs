@@ -53,6 +53,9 @@ await page.waitForFunction(() => {
   return Boolean((value && value !== "Syncing" && value !== "#000") || document.querySelector(".read-error"))
 }, { timeout: 60_000 })
 
+await page.click('[data-testid="shell-manage"]')
+await page.waitForSelector('[data-testid="submit-action"]')
+
 const appText = await page.evaluate(() => document.body.textContent ?? "")
 if (appText.includes("Demo wallet") || appText.includes("6,240.18")) throw new Error("Simulated wallet or prize data is still rendered")
 const appOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)

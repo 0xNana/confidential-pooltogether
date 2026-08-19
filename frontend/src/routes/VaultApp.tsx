@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ArrowLeft, ExternalLink, FileCheck2, Github } from "lucide-react"
+import { Activity, ArrowLeft, ExternalLink, FileCheck2, Github, LayoutDashboard, WalletCards } from "lucide-react"
 import { ActivityFeed } from "../components/ActivityFeed"
 import { BrandMark } from "../components/BrandMark"
 import { DrawStatus } from "../components/DrawStatus"
@@ -15,6 +15,13 @@ import { POOL_ADDRESS } from "../lib/contracts"
 export default function VaultApp() {
   const model = useConfidentialPoolTogether()
   const [proofOpen, setProofOpen] = useState(false)
+  const [activeView, setActiveView] = useState<"overview" | "manage" | "activity">("overview")
+
+  const viewCopy = {
+    overview: { eyebrow: "Private pool workspace", title: "Your vault", description: "Account and draw overview." },
+    manage: { eyebrow: "Position controls", title: "Manage position", description: "Deposit or withdraw through encrypted actions." },
+    activity: { eyebrow: "Public contract record", title: "Activity", description: "Contract events without private amounts." },
+  }[activeView]
 
   return (
     <div className="app-shell vault-shell">
@@ -35,30 +42,51 @@ export default function VaultApp() {
         </div>
       </header>
 
-      <main className="vault-main">
-        {model.readError && <div className="read-error" role="alert"><strong>Sepolia read degraded.</strong><span>{model.readError}</span><button type="button" onClick={() => void model.refresh()}>Retry</button></div>}
+      <div className="vault-shell-layout">
+        <aside className="vault-sidebar" aria-label="Vault sections">
+          <div className="sidebar-heading"><p className="eyebrow">Vault sections</p><strong>Workspace</strong></div>
+          <nav className="sidebar-nav">
+            <button type="button" className={activeView === "overview" ? "active" : ""} onClick={() => setActiveView("overview")} aria-current={activeView === "overview" ? "page" : undefined} data-testid="shell-overview"><LayoutDashboard size={16} /><span>Overview</span><small>Account and draw</small></button>
+            <button type="button" className={activeView === "manage" ? "active" : ""} onClick={() => setActiveView("manage")} aria-current={activeView === "manage" ? "page" : undefined} data-testid="shell-manage"><WalletCards size={16} /><span>Manage position</span><small>Deposit or withdraw</small></button>
+            <button type="button" className={activeView === "activity" ? "active" : ""} onClick={() => setActiveView("activity")} aria-current={activeView === "activity" ? "page" : undefined} data-testid="shell-activity"><Activity size={16} /><span>Activity</span><small>Public contract events</small></button>
+          </nav>
+          <div className="sidebar-footnote"><span className="sidebar-dot" /> <span>Sepolia pool<br />Live contract state</span></div>
+        </aside>
 
-        <DrawStatus poolState={model.poolState} loading={model.loading} />
+        <main className="vault-main">
+          {model.readError && <div className="read-error" role="alert"><strong>Sepolia read degraded.</strong><span>{model.readError}</span><button type="button" onClick={() => void model.refresh()}>Retry</button></div>}
 
-        <div className="workspace-heading">
-          <div>
-            <p className="eyebrow">Private pool workspace</p>
-            <h1>Your vault</h1>
+          <DrawStatus poolState={model.poolState} loading={model.loading} />
+
+          <div className="workspace-heading">
+            <div>
+              <p className="eyebrow">{viewCopy.eyebrow}</p>
+              <h1>{viewCopy.title}</h1>
+            </div>
+            <p>{viewCopy.description}</p>
           </div>
-          <p>Review your account, manage your position, and check the current draw result.</p>
-        </div>
 
-        <section className="workspace" id="workspace" aria-label="Confidential PoolTogether vault workspace">
-          <div className="workspace-main">
-            <PositionCard {...model} />
-            <VaultAction {...model} />
-          </div>
-          <aside className="workspace-rail">
-            <PrizeCard {...model} />
-            <ActivityFeed activity={model.activity} loading={model.loading} />
-          </aside>
-        </section>
-      </main>
+          {activeView === "overview" && (
+            <section className="workspace" id="workspace" aria-label="Vault overview">
+              <div className="workspace-main"><PositionCard {...model} /></div>
+              <aside className="workspace-rail"><PrizeCard {...model} /></aside>
+            </section>
+          )}
+
+          {activeView === "manage" && (
+            <section className="focused-view" id="workspace" aria-label="Manage vault position">
+              <VaultAction {...model} />
+              <PositionCard {...model} />
+            </section>
+          )}
+
+          {activeView === "activity" && (
+            <section className="focused-view activity-view" id="workspace" aria-label="Vault activity">
+              <ActivityFeed activity={model.activity} loading={model.loading} />
+            </section>
+          )}
+        </main>
+      </div>
 
       <footer className="site-footer vault-footer">
         <a className="brand footer-brand" href="/"><BrandMark /><span><strong>Confidential PoolTogether</strong><small>Save quietly. Win verifiably.</small></span></a>

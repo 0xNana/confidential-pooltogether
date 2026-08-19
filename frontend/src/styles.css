@@ -87,7 +87,22 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .status-text.ready { color: #087064; }
 .status-text.error { color: var(--danger); }
 
-.vault-main { width: min(100% - 48px, 1440px); margin: 0 auto; padding: 34px 0 84px; }
+.vault-shell-layout { display: grid; grid-template-columns: 232px minmax(0, 1fr); align-items: start; min-height: calc(100svh - 74px); }
+.vault-sidebar { position: sticky; top: 74px; display: flex; min-width: 0; min-height: calc(100svh - 74px); flex-direction: column; padding: 34px 18px 24px; border-right: 1px solid var(--line); background: var(--surface); }
+.sidebar-heading { padding: 0 12px 20px; border-bottom: 1px solid var(--line); }
+.sidebar-heading strong { display: block; margin-top: 8px; font-family: "Newsreader Variable", Georgia, serif; font-size: 28px; line-height: 1; font-weight: 570; }
+.sidebar-nav { display: grid; min-width: 0; gap: 5px; padding-top: 18px; }
+.sidebar-nav button { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 11px; align-items: center; min-height: 66px; padding: 10px 12px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--muted); text-align: left; }
+.sidebar-nav button > svg { grid-row: 1 / -1; }
+.sidebar-nav button span { font-size: 12px; font-weight: 760; }
+.sidebar-nav button small { margin-top: 3px; color: var(--muted); font-size: 10px; }
+.sidebar-nav button:hover { background: var(--surface-low); color: var(--ink); }
+.sidebar-nav button.active { border-color: var(--ink); background: var(--ink); color: white; }
+.sidebar-nav button.active small { color: #b8bbb0; }
+.sidebar-nav button.active > svg { color: var(--lime); }
+.sidebar-footnote { display: flex; align-items: center; gap: 9px; margin: auto 12px 0; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; line-height: 1.45; text-transform: uppercase; }
+.sidebar-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: #087064; box-shadow: 0 0 0 4px var(--aqua-soft); }
+.vault-main { width: min(100% - 64px, 1240px); margin: 0 auto; padding: 34px 0 84px; }
 .read-error { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; margin-bottom: 18px; padding: 13px 16px; border: 1px solid var(--danger); border-radius: 4px; background: var(--danger-soft); color: var(--danger); font-size: 12px; }
 .read-error button { border: 0; border-bottom: 1px solid currentColor; background: transparent; color: inherit; font-weight: 720; }
 
@@ -119,6 +134,8 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .workspace { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(340px, .72fr); gap: 22px; margin-top: 18px; align-items: start; }
 .workspace-main, .workspace-rail { display: flex; min-width: 0; flex-direction: column; gap: 22px; }
 .workspace-rail { position: sticky; top: 20px; }
+.focused-view { display: grid; gap: 22px; margin-top: 18px; }
+.activity-view { max-width: 760px; }
 .ruled-panel { overflow: hidden; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); }
 .panel-titlebar, .compact-titlebar { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 24px; border-bottom: 1px solid var(--line); }
 .panel-titlebar h2, .compact-titlebar h2 { margin: 7px 0 0; font-family: "Newsreader Variable", Georgia, serif; font-size: 29px; line-height: 1; font-weight: 590; letter-spacing: 0; }
@@ -396,6 +413,12 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .site-header, .landing-nav { grid-template-columns: 1fr auto; padding-inline: 18px; }
   .main-nav, .landing-nav > nav { display: none; }
   .vault-mobile-proof { display: grid; }
+  .vault-shell-layout { grid-template-columns: 1fr; }
+  .vault-sidebar { position: static; min-height: 0; padding: 15px 18px 0; border-right: 0; border-bottom: 1px solid var(--line); }
+  .sidebar-heading, .sidebar-footnote { display: none; }
+  .sidebar-nav { display: flex; gap: 5px; padding: 0; overflow-x: auto; }
+  .sidebar-nav button { flex: 1 0 180px; min-height: 54px; }
+  .sidebar-nav button small { display: none; }
   .vault-main { width: min(100% - 36px, 760px); }
   .draw-console { grid-template-columns: 150px 1fr 1fr; }
   .draw-console > div { min-height: 82px; border-bottom: 1px solid var(--line); }
