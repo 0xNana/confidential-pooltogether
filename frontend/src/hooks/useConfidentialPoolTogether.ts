@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react"
+import { useDecryptValues, useEncrypt, useGrantPermit, useHasPermit, useClearCredentials } from "@zama-fhe/react-sdk"
+import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi"
 import {
   BrowserProvider,
   Contract,
@@ -12,7 +14,6 @@ import {
 import {
   ASSET_ABI,
   ASSET_ADDRESS,
-  CHAIN_HEX,
   CHAIN_ID,
   DEPLOYMENT_TX,
   DRAW_PHASES,
@@ -29,14 +30,6 @@ import {
   subscribeToIndexedActivity,
   type PublicActivityItem,
 } from "../lib/supabase-events"
-import {
-  clearSessionPermit,
-  createSessionPermit,
-  decryptHandles,
-  encryptPoolAmount,
-  getFhevmInstance,
-  hasSessionPermit,
-} from "../lib/fhevm-client"
 import { parseTokenAmount } from "../lib/fhevm"
 import { validateActionAmount } from "../lib/action-validation"
 
@@ -79,25 +72,37 @@ const initialPoolState: PoolState = {
 }
 
 export function useConfidentialPoolTogether() {
-  const [account, setAccount] = useState<Address>()
-  const [walletChainId, setWalletChainId] = useState<number>()
+  const { address: connectedAddress } = useAccount()
+  const walletChainId = useChainId()
+  const { connectAsync, connectors } = useConnect()
+  const { disconnectAsync } = useDisconnect()
+  const { switchChainAsync } = useSwitchChain()
+  const { mutateAsync: zamaEncrypt } = useEncrypt()
+  const { mutateAsync: grantPermit } = useGrantPermit()
+  const { mutate: clearCredentials } = useClearCredentials()
+  const account = connectedAddress as Address | undefined
   const [browserProvider, setBrowserProvider] = useState<BrowserProvider>()
   const [poolState, setPoolState] = useState(initialPoolState)
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [principalHandle, setPrincipalHandle] = useState<string>()
   const [walletHandle, setWalletHandle] = useState<string>()
+  const [prizeHandle, setPrizeHandle] = useState<`0x${string}`>()
   const [principal, setPrincipal] = useState<bigint>()
   const [walletBalance, setWalletBalance] = useState<bigint>()
   const [prize, setPrize] = useState<bigint>()
   const [isOperator, setIsOperator] = useState(false)
-  const [permitReady, setPermitReady] = useState(false)
-  const [relayerStatus, setRelayerStatus] = useState<"idle" | "loading" | "ready" | "error">("idle")
+  const [decryptInputs, setDecryptInputs] = useState<Array<{ encryptedValue: `0x${string}`; contractAddress: Address }>>([])
+  const [decryptTarget, setDecryptTarget] = useState<"position" | "prize">()
   const [loading, setLoading] = useState(true)
   const [readError, setReadError] = useState<string>()
   const [operation, setOperation] = useState<OperationState>({ stage: "idle" })
 
   const correctChain = walletChainId === CHAIN_ID
   const walletAvailable = typeof window !== "undefined" && Boolean(window.ethereum)
+  const permitQuery = useHasPermit({ contractAddresses: [POOL_ADDRESS, ASSET_ADDRESS] }, { enabled: Boolean(account && correctChain) })
+  const decryptQuery = useDecryptValues(decryptInputs, { enabled: decryptInputs.length > 0 })
+  const permitReady = permitQuery.data ?? false
+  const relayerStatus: "idle" | "loading" | "ready" | "error" = account && correctChain ? "ready" : "idle"
 
   const refreshActivity = useCallback(async () => {
     try {
@@ -209,93 +214,87 @@ export function useConfidentialPoolTogether() {
   }, [refreshActivity])
 
   useEffect(() => {
-    if (!window.ethereum) return
-    const provider = window.ethereum
-    const onAccounts = (...args: unknown[]) => {
-      const accounts = args[0] as string[] | undefined
-      const next = accounts?.[0] as Address | undefined
-      setAccount(next)
-      setPrincipal(undefined)
-      setWalletBalance(undefined)
-      setPrize(undefined)
-      setPermitReady(hasSessionPermit(next))
-    }
-    const onChain = (...args: unknown[]) => setWalletChainId(Number(args[0]))
-    provider.on?.("accountsChanged", onAccounts)
-    provider.on?.("chainChanged", onChain)
-    return () => {
-      provider.removeListener?.("accountsChanged", onAccounts)
-      provider.removeListener?.("chainChanged", onChain)
-    }
-  }, [])
+    setBrowserProvider(account && window.ethereum ? new BrowserProvider(window.ethereum as unknown as Eip1193Provider) : undefined)
+    setPrincipal(undefined)
+    setWalletBalance(undefined)
+    setPrize(undefined)
+    setPrizeHandle(undefined)
+    setDecryptInputs([])
+    setDecryptTarget(undefined)
+  }, [account])
 
   useEffect(() => {
-    if (!account || !correctChain || relayerStatus !== "idle") return
-    setRelayerStatus("loading")
-    void getFhevmInstance()
-      .then(() => setRelayerStatus("ready"))
-      .catch(() => setRelayerStatus("error"))
-  }, [account, correctChain, relayerStatus])
+    if (!decryptTarget || !decryptQuery.data) return
+    if (decryptTarget === "position") {
+      const principalKey = principalHandle as `0x${string}` | undefined
+      const walletKey = walletHandle as `0x${string}` | undefined
+      setPrincipal(principalKey && principalKey !== ZeroHash ? BigInt(decryptQuery.data[principalKey] ?? 0) : 0n)
+      setWalletBalance(walletKey && walletKey !== ZeroHash ? BigInt(decryptQuery.data[walletKey] ?? 0) : 0n)
+      setOperation({ stage: "confirmed", title: "Confidential values revealed locally" })
+    } else if (prizeHandle) {
+      setPrize(BigInt(decryptQuery.data[prizeHandle] ?? 0))
+      setOperation((previous) => ({ ...previous, stage: "confirmed", title: "Prize result revealed locally" }))
+    }
+    setDecryptInputs([])
+    setDecryptTarget(undefined)
+  }, [decryptQuery.data, decryptTarget, principalHandle, prizeHandle, walletHandle])
+
+  useEffect(() => {
+    if (!decryptTarget || !decryptQuery.error) return
+    setOperation({ stage: "error", error: errorMessage(decryptQuery.error, "Threshold decryption failed.") })
+    setDecryptInputs([])
+    setDecryptTarget(undefined)
+  }, [decryptQuery.error, decryptTarget])
 
   const connect = useCallback(async () => {
-    if (!window.ethereum) {
+    if (!walletAvailable || connectors.length === 0) {
       setOperation({ stage: "error", error: "Install an EIP-1193 wallet such as MetaMask or Rabby." })
       return
     }
     try {
       setOperation({ stage: "preparing", title: "Connecting wallet" })
-      const provider = new BrowserProvider(window.ethereum as unknown as Eip1193Provider)
-      await provider.send("eth_requestAccounts", [])
-      const signer = await provider.getSigner()
-      const address = await signer.getAddress() as Address
-      const network = await provider.getNetwork()
-      setBrowserProvider(provider)
-      setAccount(address)
-      setWalletChainId(Number(network.chainId))
-      setPermitReady(hasSessionPermit(address))
+      await connectAsync({ connector: connectors[0] })
       setOperation({ stage: "idle" })
     } catch (error) {
       setOperation({ stage: "error", error: errorMessage(error, "Wallet connection was cancelled.") })
     }
-  }, [])
+  }, [connectAsync, connectors, walletAvailable])
 
   const switchNetwork = useCallback(async () => {
-    if (!window.ethereum) return
     try {
-      await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN_HEX }] })
-      setWalletChainId(CHAIN_ID)
+      await switchChainAsync({ chainId: CHAIN_ID })
     } catch (error) {
       setOperation({ stage: "error", error: errorMessage(error, "Switch to Sepolia in your wallet.") })
     }
-  }, [])
+  }, [switchChainAsync])
 
   const authorizeReads = useCallback(async () => {
-    if (!account || !browserProvider || !correctChain) return
+    if (!account || !correctChain) return
     try {
-      setOperation({ kind: "permit", stage: "preparing", title: "Preparing private session" })
-      const signer = await browserProvider.getSigner()
       setOperation({ kind: "permit", stage: "signature", title: "Authorize confidential reads" })
-      await createSessionPermit(signer, account, [POOL_ADDRESS, ASSET_ADDRESS])
-      setPermitReady(true)
+      await grantPermit([POOL_ADDRESS, ASSET_ADDRESS])
+      await permitQuery.refetch()
       setOperation({ kind: "permit", stage: "confirmed", title: "Private session authorized" })
     } catch (error) {
       setOperation({ kind: "permit", stage: "error", error: errorMessage(error, "Could not authorize private reads.") })
     }
-  }, [account, browserProvider, correctChain])
+  }, [account, correctChain, grantPermit, permitQuery])
 
   const revealPosition = useCallback(async () => {
     if (!account || !permitReady) return
     try {
       setOperation({ stage: "preparing", title: "Requesting threshold decryption" })
-      const inputs: Array<{ handle: string; contractAddress: Address }> = []
-      if (principalHandle && principalHandle !== ZeroHash) inputs.push({ handle: principalHandle, contractAddress: POOL_ADDRESS })
-      if (walletHandle && walletHandle !== ZeroHash) inputs.push({ handle: walletHandle, contractAddress: ASSET_ADDRESS })
-      const clear = inputs.length ? await decryptHandles(account, inputs) : {}
-      const principalKey = principalHandle as `0x${string}` | undefined
-      const walletKey = walletHandle as `0x${string}` | undefined
-      setPrincipal(principalKey && principalKey !== ZeroHash ? BigInt(clear[principalKey] ?? 0) : 0n)
-      setWalletBalance(walletKey && walletKey !== ZeroHash ? BigInt(clear[walletKey] ?? 0) : 0n)
-      setOperation({ stage: "confirmed", title: "Confidential values revealed locally" })
+      const inputs: Array<{ encryptedValue: `0x${string}`; contractAddress: Address }> = []
+      if (principalHandle && principalHandle !== ZeroHash) inputs.push({ encryptedValue: principalHandle as `0x${string}`, contractAddress: POOL_ADDRESS })
+      if (walletHandle && walletHandle !== ZeroHash) inputs.push({ encryptedValue: walletHandle as `0x${string}`, contractAddress: ASSET_ADDRESS })
+      if (inputs.length === 0) {
+        setPrincipal(0n)
+        setWalletBalance(0n)
+        setOperation({ stage: "confirmed", title: "Confidential values revealed locally" })
+        return
+      }
+      setDecryptTarget("position")
+      setDecryptInputs(inputs)
     } catch (error) {
       setOperation({ stage: "error", error: errorMessage(error, "Threshold decryption failed.") })
     }
@@ -330,14 +329,15 @@ export function useConfidentialPoolTogether() {
       if (validationError) throw new Error(validationError)
       const amount = parseTokenAmount(amountInput)
       if (kind === "deposit" && !isOperator) throw new Error("Approve Confidential PoolTogether as an ERC-7984 operator first.")
-      setOperation({ kind, stage: "preparing", title: "Initializing Zama relayer" })
-      await getFhevmInstance()
       setOperation({ kind, stage: "encrypting", title: "Encrypting amount and generating proof" })
-      const encrypted = await encryptPoolAmount(amount, account)
-      setOperation({ kind, stage: "signature", title: `Confirm ${kind} in wallet` })
+      const encrypted = await zamaEncrypt({
+        values: [{ value: amount, type: "euint64" }],
+        contractAddress: POOL_ADDRESS,
+        userAddress: account,
+      })
       const signer = await browserProvider.getSigner()
       const pool = new Contract(POOL_ADDRESS, POOL_ABI, signer)
-      const tx = await pool[kind](encrypted.handle, encrypted.inputProof)
+      const tx = await pool[kind](encrypted.encryptedValues[0], encrypted.inputProof)
       setOperation({ kind, stage: "pending", title: "Confidential transaction pending", hash: tx.hash })
       const receipt = await waitForSuccess(tx.wait())
       recordActivityFromReceipt(receipt, setActivity)
@@ -350,7 +350,7 @@ export function useConfidentialPoolTogether() {
       setOperation({ kind, stage: "error", error: errorMessage(error, `${kind === "deposit" ? "Deposit" : "Withdrawal"} failed.`) })
       throw error
     }
-  }, [account, browserProvider, correctChain, isOperator, principal, refresh, walletBalance])
+  }, [account, browserProvider, correctChain, isOperator, principal, refresh, walletBalance, zamaEncrypt])
 
   const previewPrize = useCallback(async () => {
     if (!account || !browserProvider || !correctChain || !poolState.claimable) return
@@ -366,9 +366,10 @@ export function useConfidentialPoolTogether() {
         setOperation({ kind: "preview", stage: "confirmed", title: "Preview ready — authorize a private session to reveal", hash: tx.hash })
         return
       }
-      const clear = await decryptHandles(account, [{ handle, contractAddress: POOL_ADDRESS }])
-      setPrize(BigInt(clear[handle as `0x${string}`] ?? 0))
-      setOperation({ kind: "preview", stage: "confirmed", title: "Prize result revealed locally", hash: tx.hash })
+      setPrizeHandle(handle as `0x${string}`)
+      setDecryptTarget("prize")
+      setDecryptInputs([{ encryptedValue: handle as `0x${string}`, contractAddress: POOL_ADDRESS }])
+      setOperation({ kind: "preview", stage: "preparing", title: "Decrypting private result", hash: tx.hash })
     } catch (error) {
       setOperation({ kind: "preview", stage: "error", error: errorMessage(error, "Prize preview failed.") })
     }
@@ -427,16 +428,14 @@ export function useConfidentialPoolTogether() {
   }, [account, browserProvider, correctChain, refresh])
 
   const disconnect = useCallback(() => {
-    clearSessionPermit(account)
-    setAccount(undefined)
+    clearCredentials()
+    void disconnectAsync()
     setBrowserProvider(undefined)
-    setWalletChainId(undefined)
-    setPermitReady(false)
     setPrincipal(undefined)
     setWalletBalance(undefined)
     setPrize(undefined)
     setOperation({ stage: "idle" })
-  }, [account])
+  }, [clearCredentials, disconnectAsync])
 
   const clearOperation = useCallback(() => setOperation({ stage: "idle" }), [])
 

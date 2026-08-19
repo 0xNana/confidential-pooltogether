@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react"
 import { LandingPage } from "./routes/LandingPage"
+import { ConfidentialProviders } from "./providers"
 
 const VaultApp = lazy(() => import("./routes/VaultApp"))
 
@@ -9,7 +10,7 @@ export function App() {
   if (path === "/app") {
     return (
       <Suspense fallback={<AppLoading />}>
-        <VaultApp />
+        <ConfidentialProviders><VaultApp /></ConfidentialProviders>
       </Suspense>
     )
   }

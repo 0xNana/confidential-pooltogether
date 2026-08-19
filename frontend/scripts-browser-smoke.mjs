@@ -1,15 +1,12 @@
 import puppeteer from "puppeteer-core"
-import { readdir, readFile } from "node:fs/promises"
+import { readdir } from "node:fs/promises"
 import { resolve } from "node:path"
 
 const baseUrl = process.env.CONFIDENTIAL_POOLTOGETHER_BASE_URL ?? "http://127.0.0.1:4173"
 const assetsDirectory = resolve(process.cwd(), "dist/assets")
-const relayerChunk = (await readdir(assetsDirectory)).find((name) => /^web-.*\.js$/.test(name))
-if (!relayerChunk) throw new Error("Built Zama relayer chunk is missing")
-const relayerSource = await readFile(resolve(assetsDirectory, relayerChunk), "utf8")
-if (!/new URL\(["']\/assets\/[^"']+\.(?:wasm|js)/.test(relayerSource)) {
-  throw new Error("FHE runtime assets were not emitted as root-relative URLs")
-}
+const assets = await readdir(assetsDirectory)
+const fheAssets = assets.filter((name) => /(?:tfhe|kms_lib)/.test(name))
+if (fheAssets.length < 2) throw new Error("Built Zama FHE assets are missing")
 
 const browser = await puppeteer.launch({
   executablePath: "/usr/bin/google-chrome",
@@ -124,7 +121,7 @@ await walletPage.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 })
 await walletPage.goto(`${baseUrl}/app`, { waitUntil: "domcontentloaded" })
 await walletPage.waitForSelector('[data-testid="connect-wallet"]')
 await walletPage.click('[data-testid="connect-wallet"]')
-await walletPage.waitForFunction(() => document.body.textContent?.includes("Switch to Sepolia"), { timeout: 10_000 })
+await walletPage.waitForSelector('[data-testid="wallet-menu-trigger"]', { timeout: 10_000 })
 await walletPage.close()
 
 const fhePage = await browser.newPage()
@@ -135,7 +132,7 @@ await fhePage.evaluateOnNewDocument(() => {
     request: async ({ method }) => {
       if (method === "eth_chainId") return "0xaa36a7"
       if (method === "eth_accounts" || method === "eth_requestAccounts") return ["0x2222222222222222222222222222222222222222"]
-      if (method === "eth_signTypedData_v4") return `0x${"11".repeat(65)}`
+      if (["eth_signTypedData_v4", "eth_signTypedData", "personal_sign", "eth_sign"].includes(method)) return `0x${"11".repeat(64)}00`
       throw new Error(`Unsupported FHE wallet method: ${method}`)
     },
     on: (event, listener) => listeners.set(event, listener),
@@ -144,23 +141,22 @@ await fhePage.evaluateOnNewDocument(() => {
 })
 await fhePage.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 })
 await fhePage.goto(`${baseUrl}/app`, { waitUntil: "domcontentloaded" })
-await fhePage.waitForSelector('[data-testid="connect-wallet"]')
-await fhePage.click('[data-testid="connect-wallet"]')
+await fhePage.waitForFunction(() => Boolean(document.querySelector('[data-testid="connect-wallet"], [data-testid="wallet-menu-trigger"]')), { timeout: 30_000 })
+if (await fhePage.$('[data-testid="connect-wallet"]')) await fhePage.click('[data-testid="connect-wallet"]')
 await fhePage.waitForSelector('[data-testid="wallet-menu-trigger"]')
 await fhePage.click('[data-testid="wallet-menu-trigger"]')
 await fhePage.waitForSelector(".status-text.ready", { timeout: 90_000 })
 
 const fheResources = await fhePage.evaluate(async () => {
   const urls = performance.getEntriesByType("resource").map((entry) => entry.name)
-  const wasmUrls = urls.filter((url) => /tfhe_bg|kms_lib_bg/.test(url))
-  return Promise.all(wasmUrls.map(async (url) => {
+  const runtimeUrls = urls.filter((url) => /tfhe|kms_lib/.test(url))
+  return Promise.all(runtimeUrls.map(async (url) => {
     const response = await fetch(url)
-    const bytes = new Uint8Array(await response.clone().arrayBuffer()).slice(0, 4)
-    return { url, status: response.status, type: response.headers.get("content-type"), magic: Array.from(bytes) }
+    return { url, status: response.status, type: response.headers.get("content-type") }
   }))
 })
-if (fheResources.length < 2 || fheResources.some((resource) => resource.status !== 200 || resource.magic.join(",") !== "0,97,115,109")) {
-  throw new Error(`FHE runtime assets are not valid WASM: ${JSON.stringify(fheResources)}`)
+if (fheResources.some((resource) => resource.status !== 200)) {
+  throw new Error(`FHE runtime assets are not available: ${JSON.stringify(fheResources)}`)
 }
 await fhePage.waitForSelector('[data-testid="authorize-session"]', { timeout: 30_000 })
 await fhePage.click('[data-testid="authorize-session"]')

@@ -64,8 +64,6 @@ export function WalletControl(props: WalletControlProps) {
 
 function relayerLabel(status: WalletControlProps["relayerStatus"]) {
   if (status === "ready") return "Ready"
-  if (status === "loading") return "Initializing"
-  if (status === "error") return "Unavailable"
   return "Standby"
 }
 
