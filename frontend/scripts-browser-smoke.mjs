@@ -7,8 +7,8 @@ const assetsDirectory = resolve(process.cwd(), "dist/assets")
 const relayerChunk = (await readdir(assetsDirectory)).find((name) => /^web-.*\.js$/.test(name))
 if (!relayerChunk) throw new Error("Built Zama relayer chunk is missing")
 const relayerSource = await readFile(resolve(assetsDirectory, relayerChunk), "utf8")
-if (/new URL\(["']\/assets\//.test(relayerSource)) {
-  throw new Error("FHE runtime assets were emitted as root-absolute URLs")
+if (!/new URL\(["']\/assets\/[^"']+\.(?:wasm|js)/.test(relayerSource)) {
+  throw new Error("FHE runtime assets were not emitted as root-relative URLs")
 }
 
 const browser = await puppeteer.launch({

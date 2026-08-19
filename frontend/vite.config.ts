@@ -3,9 +3,9 @@ import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 
 export default defineConfig({
-  // Keep SDK workers and WASM relative to their emitted chunk so static hosts
-  // mounted below the domain root do not fall through to the SPA document.
-  base: "./",
+  // The app is a client-side route at the domain root. Root-relative assets
+  // keep the relayer WASM valid for both /app and /app/.
+  base: "/",
   plugins: [react()],
   build: {
     chunkSizeWarningLimit: 600,
