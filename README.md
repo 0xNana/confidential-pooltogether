@@ -21,6 +21,40 @@ This project was built for the Zama Developer Program Mainnet Season 4. It is V5
 - Confidential Liquidity Hunt vaults that track encrypted Earn TVL and fund prize pools from a separately funded reward reserve.
 - Supabase event indexing for public lifecycle events, with a bounded RPC fallback when the index is unavailable.
 
+## Product Flow
+
+```mermaid
+flowchart LR
+  saver["Saver wallet"] --> market{"Choose market"}
+  market --> cusdt["cUSDT vault"]
+  market --> cusdc["cUSDC vault"]
+
+  saver --> mint["Mint public test USDT or USDC"]
+  mint --> shield["Shield into confidential token"]
+  shield --> deposit["Deposit encrypted amount"]
+
+  deposit --> pool["Confidential prize pool"]
+  pool --> privateState["Encrypted balances, odds, winner, and prize"]
+  pool --> publicState["Public draw phase, deadline, participant count, and cursor"]
+
+  saver --> earn["Optional Liquidity Hunt Earn vault"]
+  earn --> reserve["Encrypted reward reserve"]
+  reserve --> pool
+
+  keeper["Any account"] --> close["closeDraw"]
+  close --> select["continueSelection"]
+  select --> claimable["Claim window"]
+  claimable --> preview["User previews prize-or-zero"]
+  preview --> claim["Claim encrypted prize-or-zero"]
+  claimable --> next["openNextDraw"]
+
+  pool --> indexer["Public event indexer"]
+  indexer --> ui["Frontend activity feed"]
+  privateState --> decrypt["Wallet-authorized private reads"]
+  decrypt --> ui
+  publicState --> ui
+```
+
 ## Repository Structure
 
 ```text
