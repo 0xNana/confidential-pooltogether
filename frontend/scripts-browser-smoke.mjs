@@ -45,7 +45,7 @@ await page.click('[data-testid="launch-app"]')
 await page.waitForFunction(() => window.location.pathname === "/app", { timeout: 10_000 })
 await page.waitForSelector('[data-testid="shell-overview"]')
 await page.waitForSelector('[data-testid="connect-wallet"]')
-await page.click('[data-testid="shell-manage"]')
+await page.click('[data-testid="shell-deposit"]')
 await page.waitForSelector('[data-testid="live-draw"]')
 await page.waitForFunction(() => {
   const value = document.querySelector(".draw-console-id strong")?.textContent
@@ -79,8 +79,8 @@ const mobileLandingOverflow = await mobilePage.evaluate(() => document.documentE
 if (mobileLandingOverflow) throw new Error("Landing page has horizontal overflow at 390px")
 await mobilePage.screenshot({ path: "/tmp/confidential-pooltogether-landing-mobile.png", fullPage: true })
 await mobilePage.click('[data-testid="launch-app"]')
-await mobilePage.waitForSelector('[data-testid="shell-manage"]')
-await mobilePage.click('[data-testid="shell-manage"]')
+await mobilePage.waitForSelector('[data-testid="shell-deposit"]')
+await mobilePage.click('[data-testid="shell-deposit"]')
 await mobilePage.waitForSelector('[data-testid="live-draw"]')
 await mobilePage.waitForFunction(() => document.querySelector(".draw-console-id strong")?.textContent !== "Syncing" || document.querySelector(".read-error"), { timeout: 60_000 })
 const mobileVaultOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
@@ -96,8 +96,8 @@ await narrowPage.waitForSelector('[data-testid="launch-app"]')
 const narrowLandingOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 if (narrowLandingOverflow) throw new Error("Landing page has horizontal overflow at 320px")
 await narrowPage.goto(`${baseUrl}/app`, { waitUntil: "domcontentloaded", timeout: 30_000 })
-await narrowPage.waitForSelector('[data-testid="shell-manage"]')
-await narrowPage.click('[data-testid="shell-manage"]')
+await narrowPage.waitForSelector('[data-testid="shell-deposit"]')
+await narrowPage.click('[data-testid="shell-deposit"]')
 await narrowPage.waitForSelector('[data-testid="live-draw"]')
 const narrowVaultOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 if (narrowVaultOverflow) throw new Error("Vault has horizontal overflow at 320px")
@@ -111,6 +111,8 @@ await walletPage.evaluateOnNewDocument(() => {
     request: async ({ method }) => {
       if (method === "eth_chainId") return "0x1"
       if (method === "eth_accounts" || method === "eth_requestAccounts") return ["0x1111111111111111111111111111111111111111"]
+      if (method === "wallet_requestPermissions") return [{ parentCapability: "eth_accounts" }]
+      if (method === "wallet_revokePermissions") return null
       throw new Error(`Unsupported mock wallet method: ${method}`)
     },
     on: (event, listener) => listeners.set(event, listener),
@@ -132,6 +134,8 @@ await fhePage.evaluateOnNewDocument(() => {
     request: async ({ method }) => {
       if (method === "eth_chainId") return "0xaa36a7"
       if (method === "eth_accounts" || method === "eth_requestAccounts") return ["0x2222222222222222222222222222222222222222"]
+      if (method === "wallet_requestPermissions") return [{ parentCapability: "eth_accounts" }]
+      if (method === "wallet_revokePermissions") return null
       if (["eth_signTypedData_v4", "eth_signTypedData", "personal_sign", "eth_sign"].includes(method)) return `0x${"11".repeat(64)}00`
       throw new Error(`Unsupported FHE wallet method: ${method}`)
     },

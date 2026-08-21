@@ -1,0 +1,20 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployer": "0x52F016116508986c6ef2419266075cD7C4C01434",
+  "tokenSymbol": "cUSDT",
+  "underlyingSymbol": "USDT",
+  "asset": "0x4E7B06D78965594eB5EF5414c357ca21E1554491",
+  "underlying": "0xa7dA08FafDC9097Cc0E7D4f113A61e31d7e8e9b0",
+  "vault": "0xA2DA21152293683A774B5F1c9D2F03A7B0116500",
+  "prizePool": "0x4f475e9A84971629d69aC91f0CC4aE102E1f3B4C",
+  "maturityPeriod": "90 days",
+  "rewardFundingCooldown": "1 day",
+  "targetApyBps": 1200,
+  "programRewardBps": 295,
+  "apyAccounting": true,
+  "rewardSourceConfigured": true,
+  "transactionHash": "0x98a0786c79c17a7c55bbeeb4eb98a4135a2142ace0cb5686820aab072fd5f9ac",
+  "rewardSourceTransactionHash": "0xdbd994cbd98994487d1294239944cfbbc4b28d8e9bf9aded789db07586d24e8d",
+  "deployedAt": "2026-08-20T22:24:49.775Z"
+}

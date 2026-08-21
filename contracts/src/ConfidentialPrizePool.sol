@@ -24,6 +24,7 @@ contract ConfidentialPrizePool is ZamaEthereumConfig, Ownable, ReentrancyGuard {
 
     IERC7984 public immutable asset;
     DrawPhase public phase;
+    address public rewardSource;
     uint64 public drawId;
     uint64 public drawClosesAt;
     uint256 public scanCursor;
@@ -52,10 +53,12 @@ contract ConfidentialPrizePool is ZamaEthereumConfig, Ownable, ReentrancyGuard {
     error EmptyPool();
     error ParticipantLimitReached();
     error InvalidBatchSize();
+    error UnauthorizedRewardSource();
 
     event DepositRecorded(address indexed account, uint64 indexed drawId);
     event WithdrawalRecorded(address indexed account, uint64 indexed drawId);
     event PrizeFunded(uint64 indexed drawId);
+    event RewardSourceSet(address indexed rewardSource);
     event DrawOpened(uint64 indexed drawId, uint64 closesAt);
     event DrawSelectionStarted(uint64 indexed drawId, uint256 participantCount);
     event DrawSelectionProgress(uint64 indexed drawId, uint256 cursor, uint256 participantCount);
@@ -69,6 +72,11 @@ contract ConfidentialPrizePool is ZamaEthereumConfig, Ownable, ReentrancyGuard {
         phase = DrawPhase.Open;
         drawClosesAt = uint64(block.timestamp + DRAW_PERIOD);
         emit DrawOpened(drawId, drawClosesAt);
+    }
+
+    function setRewardSource(address source) external onlyOwner {
+        rewardSource = source;
+        emit RewardSourceSet(source);
     }
 
     /// @notice Deposits confidential cUSDT. The pool must first be approved as
@@ -129,9 +137,20 @@ contract ConfidentialPrizePool is ZamaEthereumConfig, Ownable, ReentrancyGuard {
         emit PrizeFunded(drawId);
     }
 
+    /// @notice Receives encrypted prize liquidity from an authorized reward source.
+    /// @dev The reward source must transfer the confidential asset to this pool
+    /// before calling this function in the same transaction.
+    function receivePrizeFromSource(euint64 encryptedAmount) external nonReentrant {
+        if (msg.sender != rewardSource) revert UnauthorizedRewardSource();
+        FHE.allowThis(encryptedAmount);
+        _drawPrize[drawId] = FHE.add(_drawPrize[drawId], encryptedAmount);
+        FHE.allowThis(_drawPrize[drawId]);
+        emit PrizeFunded(drawId);
+    }
+
     /// @notice Freezes weight handles and derives a weighted random threshold
     /// without publicly decrypting the aggregate or any individual position.
-    function closeDraw() external onlyOwner {
+    function closeDraw() external {
         if (phase != DrawPhase.Open) revert DrawNotOpen();
         if (block.timestamp < drawClosesAt) revert DrawStillOpen(drawClosesAt);
         if (_participants.length == 0) revert EmptyPool();
@@ -224,7 +243,7 @@ contract ConfidentialPrizePool is ZamaEthereumConfig, Ownable, ReentrancyGuard {
         emit PrizeClaimAttempted(msg.sender, id);
     }
 
-    function openNextDraw() external onlyOwner {
+    function openNextDraw() external {
         if (phase != DrawPhase.Claimable) revert DrawNotClaimable();
         uint64 previousDrawId = drawId;
         uint64 closesAt = drawClaimClosesAt[previousDrawId];

@@ -1,12 +1,9 @@
-import { CalendarClock, CheckCircle2, CircleDot, LockKeyhole, Users } from "lucide-react"
+import { CalendarClock, CheckCircle2, LockKeyhole, Users } from "lucide-react"
 import { useEffect, useState } from "react"
 import type { PoolState } from "../hooks/useConfidentialPoolTogether"
 
 export function DrawStatus({ poolState, loading }: { poolState: PoolState; loading: boolean }) {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
-  const selectionProgress = poolState.participantCount > 0
-    ? Math.min(100, (poolState.scanCursor / poolState.participantCount) * 100)
-    : 0
 
   useEffect(() => {
     if (poolState.phase === 1) return
@@ -23,18 +20,9 @@ export function DrawStatus({ poolState, loading }: { poolState: PoolState; loadi
 
   return (
     <section className="draw-console" aria-label="Live draw state" data-testid="live-draw">
-      <div className="draw-console-id">
-        <span className={`phase-light phase-${poolState.phase}`} />
-        <div><small>Onchain draw</small><strong>{loading ? "Syncing" : `#${String(poolState.drawId).padStart(3, "0")}`}</strong></div>
-      </div>
-      <div className="draw-console-phase">
-        <span><CircleDot size={14} /> Contract phase</span>
-        <strong>{loading ? "Reading Sepolia" : poolState.phaseLabel}</strong>
-        {poolState.phase === 1 && <div className="selection-meter"><i style={{ width: `${selectionProgress}%` }} /><small>{poolState.scanCursor} / {poolState.participantCount} accounts scanned</small></div>}
-      </div>
       <div className="draw-console-metric"><Users size={17} /><span><small>Participants</small><strong>{loading ? "—" : poolState.participantCount}</strong></span></div>
       <div className="draw-console-metric"><CalendarClock size={17} /><span><small>{scheduleLabel}</small><strong>{loading ? "—" : scheduleValue}</strong></span></div>
-      <div className="draw-console-metric snapshot"><LockKeyhole size={17} /><span><small>Pool size</small><strong>Encrypted</strong></span></div>
+      <div className="draw-console-metric snapshot"><LockKeyhole size={17} /><span><small>Prize pool</small><strong>Encrypted</strong></span></div>
       <div className={`claim-status ${poolState.claimable ? "ready" : "waiting"}`}><CheckCircle2 size={16} /><span>{poolState.claimable ? "Claims open" : poolState.phase === 2 ? "Window closed" : "Prize sealed"}</span></div>
     </section>
   )

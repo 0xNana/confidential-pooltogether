@@ -1,18 +1,58 @@
+# Dependencies
 node_modules/
 **/node_modules/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Build output
 dist/
 **/dist/
-.env
-.env.local
-contract-artifacts/
-contract-cache/
-contracts/artifacts/
-contracts/cache/
-contracts/fhevmTemp/
-fhevmTemp/
-backend/supabase/.branches/
-backend/supabase/.temp/
+build/
+**/build/
 coverage/
 **/coverage/
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Hardhat and FHEVM
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+contracts/fhevmTemp/
+contract-artifacts/
+contract-cache/
+fhevmTemp/
+
+# Supabase
+backend/supabase/.branches/
+backend/supabase/.temp/
+
+# Tooling caches
+.eslintcache
+.vite/
+.turbo/
+.vercel/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Local reference material
 veilflow/

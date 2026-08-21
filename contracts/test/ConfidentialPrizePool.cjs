@@ -44,9 +44,9 @@ describe("ConfidentialPrizePool", function () {
     assert.equal(pool.interface.hasFunction("snapshotTotal"), false)
     assert.equal(pool.interface.hasFunction("finalizeSnapshot"), false)
 
-    await assert.rejects(pool.closeDraw())
+    await assert.rejects(pool.connect(alice).closeDraw())
     await advanceTo(await pool.drawClosesAt())
-    await (await pool.closeDraw()).wait()
+    await (await pool.connect(alice).closeDraw()).wait()
 
     assert.equal(await pool.phase(), 1n)
     assert.equal(await pool.scanCursor(), 0n)
@@ -91,10 +91,10 @@ describe("ConfidentialPrizePool", function () {
     await (await pool.continueSelection(12)).wait()
 
     const claimClosesAt = await pool.drawClaimClosesAt(1)
-    await assert.rejects(pool.openNextDraw())
+    await assert.rejects(pool.connect(alice).openNextDraw())
     await advanceTo(claimClosesAt)
     await assert.rejects(pool.connect(alice).claimPrize(1))
-    await (await pool.openNextDraw()).wait()
+    await (await pool.connect(alice).openNextDraw()).wait()
     assert.equal(await pool.drawId(), 2n)
     assert.equal(await pool.drawClaimable(1), false)
 

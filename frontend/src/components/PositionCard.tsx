@@ -4,7 +4,7 @@ import { formatTokenAmount } from "../lib/fhevm"
 
 type PositionCardProps = Pick<
   ConfidentialPoolTogetherModel,
-  "account" | "correctChain" | "permitReady" | "principal" | "walletBalance" | "operation" | "connect" | "switchNetwork" | "authorizeReads" | "revealPosition"
+  "account" | "activeMarket" | "correctChain" | "permitReady" | "principal" | "walletBalance" | "operation" | "connect" | "switchNetwork" | "authorizeReads" | "revealPosition"
 >
 
 export function PositionCard(props: PositionCardProps) {
@@ -14,8 +14,8 @@ export function PositionCard(props: PositionCardProps) {
     <section className="position-card ruled-panel" aria-labelledby="position-title">
       <header className="panel-titlebar">
         <div>
-          <p className="eyebrow">Private ledger</p>
-          <h2 id="position-title">Your confidential position</h2>
+          <p className="eyebrow">In this vault</p>
+          <h2 id="position-title">Your wallet</h2>
         </div>
         <span className="security-badge"><LockKeyhole size={13} /> Encrypted onchain</span>
       </header>
@@ -35,17 +35,17 @@ export function PositionCard(props: PositionCardProps) {
       ) : (
         <>
           <div className="ledger-grid">
-            <LedgerValue label="Deposited principal" value={props.principal === undefined ? undefined : `${formatTokenAmount(props.principal)} cUSDT`} />
-            <LedgerValue label="Confidential wallet" value={props.walletBalance === undefined ? undefined : `${formatTokenAmount(props.walletBalance)} cUSDT`} />
+            <LedgerValue label="Your balance" value={props.principal === undefined ? undefined : `${formatTokenAmount(props.principal)} ${props.activeMarket.tokenSymbol}`} />
+            <LedgerValue label="Wallet" value={props.walletBalance === undefined ? undefined : `${formatTokenAmount(props.walletBalance)} ${props.activeMarket.tokenSymbol}`} />
             <div className="ledger-value ledger-private"><span><LockKeyhole size={12} /> Draw entry</span><strong>{props.principal === undefined ? "—" : props.principal > 0n ? "Active" : "Inactive"}</strong><small>Odds remain encrypted with the pool</small></div>
           </div>
 
           {!props.permitReady ? (
             <div className="permit-callout">
               <KeyRound size={19} />
-              <div><strong>Authorize a private session</strong><p>One EIP-712 signature unlocks pool and cUSDT reads for 24 hours on this device. No transaction or gas.</p></div>
+              <div><strong>Reveal your private position</strong><p>Sign once to let this device decrypt your balances and prize status. Nothing is posted onchain.</p></div>
               <button className="button button-ink" type="button" onClick={() => void props.authorizeReads()} disabled={authorizing} data-testid="authorize-session">
-                {authorizing ? "Check wallet" : "Authorize reads"}
+                {authorizing ? "Check wallet" : "Reveal privately"}
               </button>
             </div>
           ) : props.principal === undefined || props.walletBalance === undefined ? (

@@ -1,81 +1,203 @@
 # Confidential PoolTogether
 
-Confidential PoolTogether is a confidential no-loss prize vault built for Zama Developer Program Mainnet Season 4. Savers deposit ERC-7984 cUSDT, keep access to their principal, and enter a weighted prize draw without publishing individual deposit amounts, balances, odds, winner identity, or winnings.
+Confidential PoolTogether is a no-loss prize savings prototype built with Zama FHEVM. Users deposit confidential stablecoins, keep access to their principal, and enter weighted prize draws without publishing deposit amounts, balances, odds, winner identity, or prize amounts.
 
-The first screen is a dedicated product landing page; **Launch app** opens the live vault workspace. Public state is read from the Sepolia deployment, wallet actions use the Zama browser relayer, and every deposit, withdrawal, preview, and claim submits a real transaction. There are no seeded balances, simulated winners, or frontend-only prize values.
+The current Sepolia deployment supports two markets:
 
-## What is implemented
+- `cUSDT`
+- `cUSDC`
 
-- Production-oriented React interface inspired by Veilflow's editorial hierarchy and redaction language.
-- Live Sepolia contract reads for draw phase, participant count, selection cursor, draw/claim deadlines, and claim status.
-- Supabase-backed public event index with read-only RLS, Realtime updates, server-only ingestion credentials, and bounded RPC fallback.
-- Zama's official Sepolia `cUSDTMock` wrapper and public-mint underlying from the protocol address registry; no application token is deployed.
-- EIP-1193 wallet connection and explicit Sepolia network gating.
-- Real ERC-7984 operator approval with a 30-day expiry.
-- Browser-side `euint64` encryption and proof generation bound to the pool contract through `@zama-fhe/relayer-sdk`.
-- Real deposit and withdrawal transactions with distinct initialization, encryption, signature, pending, confirmed, and recoverable error states.
-- Explicit one-day EIP-712 decryption sessions; no automatic signature prompts.
-- User-only KMS threshold decryption for principal, confidential cUSDT balance, and prize-or-zero results.
-- Live verification drawer backed by contract state rather than a static success screen.
-- Compilable FHEVM contract using OpenZeppelin ERC-7984 cUSDT transfers.
-- Encrypted weighted selection in bounded batches to respect FHEVM HCU limits.
-- FHEVM integration tests covering ACL persistence, withdrawal validation, private weighted selection, zero-total draws, bounded claims, and encrypted prize rollover.
+This project was built for the Zama Developer Program Mainnet Season 4. It is V5-style in product behavior: draw progression is permissionless, multiple prize markets are supported, and the interface separates saving, shielding, sending, earning, and draw verification. It is not a direct fork of PoolTogether V5's TWAB controller, liquidator, tiered prize pool, or VRGDA claimer.
 
-## Confidentiality model
+## Features
 
-| State | Visibility |
-|---|---|
-| Individual deposit amount | Encrypted input, bound to the pool contract |
-| Principal balance | `euint64`, decryptable by the saver |
-| Snapshot weight / odds | `euint64`, contract-only |
-| Winner | `eaddress`, contract-only |
-| Prize | `euint64`, winner sees `prize-or-zero` |
-| Aggregate pool / snapshot total | `euint64`, contract-only |
-| Draw phase, deadlines, participant count, cursor | Public |
+- React and Vite frontend for the live vault workspace.
+- Sepolia wallet support with explicit network gating.
+- Zama browser relayer integration for encrypted inputs, proofs, permits, and user decryption.
+- ERC-7984 cUSDT and cUSDC support using Zama's official Sepolia mock wrappers.
+- Encrypted deposits, withdrawals, balances, prize previews, and prize claims.
+- Permissionless draw lifecycle methods for closing draws, continuing selection, and opening the next draw.
+- Encrypted weighted winner selection with bounded scan batches.
+- Confidential Liquidity Hunt vaults that track encrypted Earn TVL and fund prize pools from a separately funded reward reserve.
+- Supabase event indexing for public lifecycle events, with a bounded RPC fallback when the index is unavailable.
 
-The aggregate pool size is never decrypted or emitted. Winner selection multiplies the encrypted snapshot total by an encrypted 64-bit random value, then compares it with encrypted cumulative weights scaled into `euint128`. `FHE.select` assigns the first matching account without a plaintext winner branch, revert, or event.
+## Repository Structure
 
-Every claimant follows the same public path. `claimPrize()` computes an encrypted `prize-or-zero` transfer, so a non-winner and a repeat claimant do not produce a distinguishing conditional revert. After the public claim deadline, the remaining encrypted reserve is moved to the next draw and the old draw is disabled without decrypting whether anything remained.
+```text
+.
+├── backend/    Supabase migrations and Sepolia event indexer
+├── contracts/  Hardhat project, Solidity contracts, tests, and deployment scripts
+├── docs/       Architecture and design notes
+└── frontend/   Vite React application
+```
 
-## Contract lifecycle
+## Requirements
 
-1. A saver grants the pool a time-bounded ERC-7984 operator approval.
-2. `deposit()` converts proof-backed input in the pool, transiently grants the token access, and transfers cUSDT.
-3. `closeDraw()` snapshots encrypted balance handles after the onchain deadline and derives an encrypted threshold without disclosing the total.
-4. `continueSelection()` advances the weighted scan in batches of at most 12 accounts.
-5. `previewPrize(drawId)` gives the caller a decryptable prize-or-zero handle during the claim window.
-6. `claimPrize(drawId)` transfers prize-or-zero to the caller's confidential token balance.
-7. `openNextDraw()` closes the old claim path and moves any encrypted remainder into the next draw.
+- Node.js 20 or newer
+- npm
+- A Sepolia RPC endpoint
+- A funded Sepolia deployer wallet for deployment and reward seeding
+- Optional: Supabase project for indexed public activity
 
-## Run locally
+## Setup
+
+Install dependencies:
 
 ```bash
 npm install
+```
+
+Create a local environment file:
+
+```bash
+cp .env.example .env.local
+```
+
+Set the variables needed for the workflows you use:
+
+```bash
+SEPOLIA_RPC_URL=
+DEPLOYER_PRIVATE_KEY=
+ETHERSCAN_API_KEY=
+VITE_SUPABASE_URL=
+VITE_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+```
+
+Only `VITE_` variables are exposed to the browser. Keep deployer keys and Supabase service-role credentials server-side.
+
+## Development
+
+Run the frontend:
+
+```bash
 npm run dev
 ```
 
-This repository is organized as npm workspaces:
+Build the frontend:
 
-- `frontend/` contains the Vite React app.
-- `contracts/` contains Hardhat config, Solidity sources, deployments, and contract tests.
-- `backend/` contains Supabase migrations and the Sepolia event indexer.
+```bash
+npm run build
+```
 
-Verification:
+Run frontend tests:
 
 ```bash
 npm test
-npm run lint
-npm run build
-npm run contracts:compile
-npm run contracts:test
-npm run events:index
-npm run browser:smoke
-npm audit --omit=dev
 ```
 
-## Supabase event backend
+Run linting:
 
-The browser receives only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. Keep `SUPABASE_SERVICE_ROLE_KEY` server-side for the idempotent event indexer.
+```bash
+npm run lint
+```
+
+Run contract tests:
+
+```bash
+npm run contracts:test
+```
+
+Compile contracts:
+
+```bash
+npm run contracts:compile
+```
+
+Run the browser smoke test:
+
+```bash
+npm run browser:smoke
+```
+
+## Contract Deployment
+
+Deploy the default cUSDT pool:
+
+```bash
+npm run contracts:deploy
+```
+
+Deploy the cUSDC pool:
+
+```bash
+npm run contracts:deploy:usdc
+```
+
+Deploy Liquidity Hunt reward vaults:
+
+```bash
+npm run contracts:deploy:vault
+npm run contracts:deploy:vault:usdc
+```
+
+Verify deployments:
+
+```bash
+npm run contracts:verify-deployment
+npm run contracts:verify-deployment:usdc
+npm run contracts:verify:vault
+npm run contracts:verify:vault:usdc
+npm run contracts:verify-source
+npm run contracts:verify-source:usdc
+```
+
+Seed reward reserves:
+
+```bash
+REWARD_RESERVE=1 npm run contracts:fund:vault
+REWARD_RESERVE=1 npm run contracts:fund:vault:usdc
+```
+
+Deployment manifests are written to `contracts/deployments/` and copied into `frontend/src/generated/`. The frontend reads those generated manifests through `frontend/src/lib/contracts.ts`.
+
+## Current Sepolia Deployments
+
+| Market | Pool | Reward vault | Draw 1 close |
+| --- | --- | --- | --- |
+| cUSDT | `0x4f475e9A84971629d69aC91f0CC4aE102E1f3B4C` | `0xA2DA21152293683A774B5F1c9D2F03A7B0116500` | `2026-08-27 22:24:24 UTC` |
+| cUSDC | `0x17f8C7703B0BCC665f97C870877f417AAfcc0E9E` | `0xBbCDf44f8192cf253451368C679eAe1eFA58B33D` | `2026-08-27 22:25:12 UTC` |
+
+Verified source:
+
+- cUSDT pool: https://sepolia.etherscan.io/address/0x4f475e9A84971629d69aC91f0CC4aE102E1f3B4C#code
+- cUSDC pool: https://sepolia.etherscan.io/address/0x17f8C7703B0BCC665f97C870877f417AAfcc0E9E#code
+
+Official Zama Sepolia wrappers:
+
+| Token | Wrapper | Underlying |
+| --- | --- | --- |
+| cUSDT | `0x4E7B06D78965594eB5EF5414c357ca21E1554491` | `0xa7dA08FafDC9097Cc0E7D4f113A61e31d7e8e9b0` |
+| cUSDC | `0x7c5BF43B851c1dff1a4feE8dB225b87f2C223639` | `0x9b5Cd13b8eFbB58Dc25A05CF411D8056058aDFfF` |
+
+## Confidentiality Model
+
+| Data | Visibility |
+| --- | --- |
+| Deposit and withdrawal amounts | Encrypted input bound to the target contract |
+| User principal | Encrypted handle, decryptable by the user |
+| Confidential token balance | Encrypted handle, decryptable by the user |
+| Snapshot weight and odds | Encrypted, contract-only |
+| Winner address | Encrypted, contract-only |
+| Prize amount | Encrypted prize-or-zero result, decryptable by the caller |
+| Aggregate pool size | Encrypted, contract-only |
+| Draw phase, deadlines, participant count, and selection cursor | Public |
+
+Participant addresses and transaction timing remain visible at the Ethereum account layer. This prototype does not claim account-level participation privacy.
+
+## Draw Lifecycle
+
+1. A user grants the pool a time-bounded ERC-7984 operator approval.
+2. The user deposits encrypted cUSDT or cUSDC into the selected prize pool.
+3. Anyone can call `closeDraw()` after the draw deadline.
+4. Anyone can call `continueSelection()` to progress encrypted weighted winner selection in bounded batches.
+5. During the claim window, participants call `previewPrize(drawId)` to create a decryptable prize-or-zero result.
+6. Participants call `claimPrize(drawId)` to receive the encrypted prize-or-zero transfer.
+7. Anyone can call `openNextDraw()` after the claim window closes.
+
+## Supabase Event Index
+
+The app can read public lifecycle events from Supabase. Browser clients only need the publishable key.
 
 ```bash
 cd backend
@@ -85,61 +207,12 @@ cd ..
 npm run events:index
 ```
 
-Run `events:index` on a short server-side schedule. It checkpoints finalized Sepolia blocks and upserts by chain, contract, transaction hash, and log index. If the backend is absent or degraded, the UI falls back to a bounded recent-log query rather than an unbounded `eth_getLogs` request.
+The indexer stores finalized public events and checkpoints by chain and contract. If Supabase is not configured, the frontend falls back to bounded Sepolia RPC log reads.
 
-## Sepolia deployment
-
-Pool contract:
-
-```text
-0x717256cd7d56C61878D601D1e69429Fa3d88fc91
-```
-
-Deployment transaction:
-
-```text
-0xe3ca3955070bc029d75414c9021f902ced91b41da6b7ed2c7961d751502e1e3b
-```
-
-The source is verified on Etherscan:
-
-https://sepolia.etherscan.io/address/0x717256cd7d56C61878D601D1e69429Fa3d88fc91#code
-
-The pool is immutably bound to Zama's official Sepolia cUSDTMock wrapper:
-
-```text
-0x4E7B06D78965594eB5EF5414c357ca21E1554491
-```
-
-The interface includes the official testnet funding path: mint the registered underlying test USDT at `0xa7dA08FafDC9097Cc0E7D4f113A61e31d7e8e9b0`, approve the wrapper, and call `wrap()` to create confidential cUSDT. The local `ConfidentialTokenFixture` exists only for deterministic Hardhat tests and is never selected by the Sepolia deployment script.
-
-To produce another deployment, configure `SEPOLIA_RPC_URL` and `DEPLOYER_PRIVATE_KEY`, then run:
-
-```bash
-npm run contracts:deploy
-```
-
-The deployment script exports `contracts/deployments/sepolia.json` and `frontend/src/generated/deployment.json`; the frontend consumes the generated manifest directly. Source verification reads the contract manifest, so no contract address is hardcoded in package scripts.
-
-The deployer private key is used only by Hardhat scripts. It is never imported through a `VITE_` environment variable or shipped to the browser bundle.
-
-## Frontend architecture
-
-- `frontend/src/hooks/useConfidentialPoolTogether.ts` owns wallet lifecycle, live reads, transaction orchestration, indexed activity, and refresh behavior.
-- `frontend/src/lib/fhevm-client.ts` lazily initializes the Zama WASM relayer, encrypts inputs, creates session permits, and performs user decryption.
-- `frontend/src/lib/supabase-events.ts` reads the public event index and subscribes to inserts without exposing server credentials.
-- `backend/index-events.mjs` is the server-side, idempotent Sepolia indexer. It stores only public lifecycle metadata and checkpoints finalized blocks.
-- `backend/supabase/migrations/` defines explicit grants and RLS: anonymous clients can select public events, while only `service_role` can write events or indexer state.
-- `frontend/src/lib/contracts.ts` is the deployment/ABI boundary consumed by the interface.
-- Vite serves COOP/COEP headers so browser FHE encryption can use `SharedArrayBuffer` and the SDK worker pool.
-- The app remains useful in disconnected read-only mode and renders explicit empty, loading, wrong-network, relayer, wallet-signature, transaction, and decryption states.
-
-## Production hardening path
-
-The current contract accepts yield through the owner-gated `fundPrize()` hook. Before mainnet custody, replace that hook with an audited confidential yield adapter for the selected strategy, decentralize keeper operations, add invariant and fuzz coverage, and complete the OpenZeppelin audit described by the bounty.
-
-The testnet architecture supports at most 256 lifetime participant addresses so encrypted winner selection remains bounded. Zero-balance accounts remain in the scan because publicly pruning them would disclose private position state.
-
-Participant addresses and transaction timing remain observable at the Ethereum account layer even though amounts and positions are encrypted. Hiding participation itself requires an additional relayer or account-abstraction privacy layer and is not claimed here.
+## Security Notes
 
 This code is unaudited and should not custody production funds.
+
+The Liquidity Hunt reward vault is a testnet APY simulator. Rewards come from a separately funded encrypted reserve, not from realized external strategy yield. Before mainnet use, replace the reserve simulator with an audited yield adapter, add broader invariant and fuzz testing, decentralize keeper operations, and complete an external audit.
+
+The current winner-selection implementation is intentionally bounded for testnet demonstration and supports at most 256 lifetime participant addresses.

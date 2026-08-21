@@ -7,8 +7,16 @@
     "compile": "hardhat compile",
     "check-deployer": "hardhat run scripts/check-deployer.cjs --network sepolia",
     "deploy": "hardhat run scripts/deploy.cjs --network sepolia",
+    "deploy:usdc": "TOKEN_SYMBOL=cUSDC hardhat run scripts/deploy.cjs --network sepolia",
+    "deploy:vault": "hardhat run scripts/deploy-vault.cjs --network sepolia",
+    "deploy:vault:usdc": "TOKEN_SYMBOL=cUSDC hardhat run scripts/deploy-vault.cjs --network sepolia",
+    "fund:vault": "hardhat run scripts/fund-vault.cjs --network sepolia",
+    "fund:vault:usdc": "TOKEN_SYMBOL=cUSDC hardhat run scripts/fund-vault.cjs --network sepolia",
     "test": "hardhat test",
     "verify-deployment": "hardhat run scripts/verify-deployment.cjs --network sepolia",
+    "verify-deployment:usdc": "TOKEN_SYMBOL=cUSDC hardhat run scripts/verify-deployment.cjs --network sepolia",
+    "verify:vault": "hardhat run scripts/verify-vault.cjs --network sepolia",
+    "verify:vault:usdc": "TOKEN_SYMBOL=cUSDC hardhat run scripts/verify-vault.cjs --network sepolia",
     "verify-source": "hardhat run scripts/verify-source.cjs --network sepolia"
   },
   "devDependencies": {

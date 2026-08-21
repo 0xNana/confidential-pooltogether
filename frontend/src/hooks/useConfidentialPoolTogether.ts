@@ -13,16 +13,16 @@ import {
 } from "ethers"
 import {
   ASSET_ABI,
-  ASSET_ADDRESS,
   CHAIN_ID,
-  DEPLOYMENT_TX,
+  DEFAULT_MARKET,
   DRAW_PHASES,
+  MARKETS,
   POOL_ABI,
-  POOL_ADDRESS,
+  LIQUIDITY_VAULT_ABI,
   SEPOLIA_RPC_URL,
   UNDERLYING_ABI,
-  UNDERLYING_ADDRESS,
   type Address,
+  type MarketId,
 } from "../lib/contracts"
 import { fetchRecentLogs } from "../lib/rpc-logs"
 import {
@@ -59,7 +59,7 @@ export type OperationState = {
 
 const readProvider = new JsonRpcProvider(SEPOLIA_RPC_URL, CHAIN_ID, { staticNetwork: true })
 const poolInterface = new Interface(POOL_ABI)
-let cachedDeploymentBlock: number | undefined
+const cachedDeploymentBlocks: Partial<Record<MarketId, number>> = {}
 const initialPoolState: PoolState = {
   drawId: 0,
   phase: 0,
@@ -81,6 +81,8 @@ export function useConfidentialPoolTogether() {
   const { mutateAsync: grantPermit } = useGrantPermit()
   const { mutate: clearCredentials } = useClearCredentials()
   const account = connectedAddress as Address | undefined
+  const [activeMarketId, setActiveMarketId] = useState<MarketId>(DEFAULT_MARKET.id)
+  const activeMarket = MARKETS[activeMarketId]
   const [browserProvider, setBrowserProvider] = useState<BrowserProvider>()
   const [poolState, setPoolState] = useState(initialPoolState)
   const [activity, setActivity] = useState<ActivityItem[]>([])
@@ -89,6 +91,9 @@ export function useConfidentialPoolTogether() {
   const [prizeHandle, setPrizeHandle] = useState<`0x${string}`>()
   const [principal, setPrincipal] = useState<bigint>()
   const [walletBalance, setWalletBalance] = useState<bigint>()
+  const [underlyingBalance, setUnderlyingBalance] = useState<bigint>()
+  const [vaultTvlHandle, setVaultTvlHandle] = useState<string>()
+  const [vaultTvl, setVaultTvl] = useState<bigint>()
   const [prize, setPrize] = useState<bigint>()
   const [isOperator, setIsOperator] = useState(false)
   const [decryptInputs, setDecryptInputs] = useState<Array<{ encryptedValue: `0x${string}`; contractAddress: Address }>>([])
@@ -99,14 +104,27 @@ export function useConfidentialPoolTogether() {
 
   const correctChain = walletChainId === CHAIN_ID
   const walletAvailable = typeof window !== "undefined" && Boolean(window.ethereum)
-  const permitQuery = useHasPermit({ contractAddresses: [POOL_ADDRESS, ASSET_ADDRESS] }, { enabled: Boolean(account && correctChain) })
+  const permitQuery = useHasPermit({ contractAddresses: [activeMarket.poolAddress, activeMarket.assetAddress, activeMarket.liquidityVaultAddress] }, { enabled: Boolean(account && correctChain) })
   const decryptQuery = useDecryptValues(decryptInputs, { enabled: decryptInputs.length > 0 })
   const permitReady = permitQuery.data ?? false
   const relayerStatus: "idle" | "loading" | "ready" | "error" = account && correctChain ? "ready" : "idle"
 
+  const selectMarket = useCallback((marketId: MarketId) => {
+    setActiveMarketId(marketId)
+    setPrincipal(undefined)
+    setWalletBalance(undefined)
+    setUnderlyingBalance(undefined)
+    setVaultTvl(undefined)
+    setPrize(undefined)
+    setPrizeHandle(undefined)
+    setDecryptInputs([])
+    setDecryptTarget(undefined)
+    setIsOperator(false)
+  }, [])
+
   const refreshActivity = useCallback(async () => {
     try {
-      const indexed = await fetchIndexedActivity(7)
+      const indexed = await fetchIndexedActivity(activeMarket.poolAddress, 7)
       if (indexed !== undefined) {
         setActivity(indexed)
         return
@@ -116,19 +134,20 @@ export function useConfidentialPoolTogether() {
     }
 
     try {
-      if (cachedDeploymentBlock === undefined) {
-        const deployReceipt = await readProvider.getTransactionReceipt(DEPLOYMENT_TX)
-        cachedDeploymentBlock = deployReceipt?.blockNumber
-        if (cachedDeploymentBlock !== undefined) {
-          setPoolState((previous) => ({ ...previous, deploymentBlock: cachedDeploymentBlock }))
+      if (cachedDeploymentBlocks[activeMarket.id] === undefined) {
+        const deployReceipt = await readProvider.getTransactionReceipt(activeMarket.deploymentTx)
+        cachedDeploymentBlocks[activeMarket.id] = deployReceipt?.blockNumber
+        if (cachedDeploymentBlocks[activeMarket.id] !== undefined) {
+          setPoolState((previous) => ({ ...previous, deploymentBlock: cachedDeploymentBlocks[activeMarket.id] }))
         }
       }
 
-      if (cachedDeploymentBlock === undefined) return
+      const deploymentBlock = cachedDeploymentBlocks[activeMarket.id]
+      if (deploymentBlock === undefined) return
       const currentBlock = await readProvider.getBlockNumber()
       const recent = await fetchRecentLogs(
-        (range) => readProvider.getLogs({ address: POOL_ADDRESS, ...range }),
-        cachedDeploymentBlock,
+        (range) => readProvider.getLogs({ address: activeMarket.poolAddress, ...range }),
+        deploymentBlock,
         currentBlock,
         { chunkSize: 500, maxLookback: 5_000, limit: 7 },
       )
@@ -136,13 +155,15 @@ export function useConfidentialPoolTogether() {
     } catch {
       // Activity metadata is best-effort and must not invalidate live pool state.
     }
-  }, [])
+  }, [activeMarket])
 
   const refresh = useCallback(async (includeActivity = false) => {
     setReadError(undefined)
     try {
-      const pool = new Contract(POOL_ADDRESS, POOL_ABI, readProvider)
-      const asset = new Contract(ASSET_ADDRESS, ASSET_ABI, readProvider)
+      const pool = new Contract(activeMarket.poolAddress, POOL_ABI, readProvider)
+      const asset = new Contract(activeMarket.assetAddress, ASSET_ABI, readProvider)
+      const underlying = new Contract(activeMarket.underlyingAddress, UNDERLYING_ABI, readProvider)
+      const liquidityVault = new Contract(activeMarket.liquidityVaultAddress, LIQUIDITY_VAULT_ABI, readProvider)
       const [drawIdRaw, phaseRaw, drawClosesAtRaw, participantCountRaw, scanCursorRaw] =
         await Promise.all([
           pool.drawId(),
@@ -168,21 +189,26 @@ export function useConfidentialPoolTogether() {
         participantCount: Number(participantCountRaw),
         scanCursor: Number(scanCursorRaw),
         claimable,
-        deploymentBlock: cachedDeploymentBlock,
+        deploymentBlock: cachedDeploymentBlocks[activeMarket.id],
       })
 
       if (account) {
-        const [nextPrincipalHandle, nextWalletHandle, operator] = await Promise.all([
+        const [nextPrincipalHandle, nextWalletHandle, nextUnderlyingBalance, operator] = await Promise.all([
           pool.principalOf(account),
           asset.confidentialBalanceOf(account),
-          asset.isOperator(account, POOL_ADDRESS),
+          underlying.balanceOf(account),
+          asset.isOperator(account, activeMarket.poolAddress),
         ])
+        setVaultTvlHandle(String(await liquidityVault.totalPrincipal()))
         setPrincipalHandle(String(nextPrincipalHandle))
         setWalletHandle(String(nextWalletHandle))
+        setUnderlyingBalance(BigInt(nextUnderlyingBalance))
         setIsOperator(Boolean(operator))
       } else {
         setPrincipalHandle(undefined)
         setWalletHandle(undefined)
+        setVaultTvlHandle(undefined)
+        setUnderlyingBalance(undefined)
         setIsOperator(false)
       }
 
@@ -192,7 +218,7 @@ export function useConfidentialPoolTogether() {
     } finally {
       setLoading(false)
     }
-  }, [account, refreshActivity])
+  }, [account, activeMarket, refreshActivity])
 
   useEffect(() => {
     void refresh(true)
@@ -203,7 +229,7 @@ export function useConfidentialPoolTogether() {
   useEffect(() => {
     let disposed = false
     let unsubscribe: () => void = () => {}
-    void subscribeToIndexedActivity(() => void refreshActivity()).then((cleanup) => {
+    void subscribeToIndexedActivity(activeMarket.poolAddress, () => void refreshActivity()).then((cleanup) => {
       if (disposed) cleanup()
       else unsubscribe = cleanup
     })
@@ -211,12 +237,14 @@ export function useConfidentialPoolTogether() {
       disposed = true
       unsubscribe()
     }
-  }, [refreshActivity])
+  }, [activeMarket.poolAddress, refreshActivity])
 
   useEffect(() => {
     setBrowserProvider(account && window.ethereum ? new BrowserProvider(window.ethereum as unknown as Eip1193Provider) : undefined)
     setPrincipal(undefined)
     setWalletBalance(undefined)
+    setUnderlyingBalance(undefined)
+    setVaultTvl(undefined)
     setPrize(undefined)
     setPrizeHandle(undefined)
     setDecryptInputs([])
@@ -230,6 +258,9 @@ export function useConfidentialPoolTogether() {
       const walletKey = walletHandle as `0x${string}` | undefined
       setPrincipal(principalKey && principalKey !== ZeroHash ? BigInt(decryptQuery.data[principalKey] ?? 0) : 0n)
       setWalletBalance(walletKey && walletKey !== ZeroHash ? BigInt(decryptQuery.data[walletKey] ?? 0) : 0n)
+      const tvlKey = vaultTvlHandle as `0x${string}` | undefined
+      const canRevealTvl = account?.toLowerCase() === activeMarket.liquidityVaultDeployer.toLowerCase()
+      setVaultTvl(canRevealTvl && tvlKey && tvlKey !== ZeroHash ? BigInt(decryptQuery.data[tvlKey] ?? 0) : undefined)
       setOperation({ stage: "confirmed", title: "Confidential values revealed locally" })
     } else if (prizeHandle) {
       setPrize(BigInt(decryptQuery.data[prizeHandle] ?? 0))
@@ -237,7 +268,7 @@ export function useConfidentialPoolTogether() {
     }
     setDecryptInputs([])
     setDecryptTarget(undefined)
-  }, [decryptQuery.data, decryptTarget, principalHandle, prizeHandle, walletHandle])
+  }, [account, activeMarket.liquidityVaultDeployer, decryptQuery.data, decryptTarget, principalHandle, prizeHandle, vaultTvlHandle, walletHandle])
 
   useEffect(() => {
     if (!decryptTarget || !decryptQuery.error) return
@@ -272,21 +303,24 @@ export function useConfidentialPoolTogether() {
     if (!account || !correctChain) return
     try {
       setOperation({ kind: "permit", stage: "signature", title: "Authorize confidential reads" })
-      await grantPermit([POOL_ADDRESS, ASSET_ADDRESS])
+      await grantPermit([activeMarket.poolAddress, activeMarket.assetAddress, activeMarket.liquidityVaultAddress])
       await permitQuery.refetch()
       setOperation({ kind: "permit", stage: "confirmed", title: "Private session authorized" })
     } catch (error) {
       setOperation({ kind: "permit", stage: "error", error: errorMessage(error, "Could not authorize private reads.") })
     }
-  }, [account, correctChain, grantPermit, permitQuery])
+  }, [account, activeMarket, correctChain, grantPermit, permitQuery])
 
   const revealPosition = useCallback(async () => {
     if (!account || !permitReady) return
     try {
       setOperation({ stage: "preparing", title: "Requesting threshold decryption" })
       const inputs: Array<{ encryptedValue: `0x${string}`; contractAddress: Address }> = []
-      if (principalHandle && principalHandle !== ZeroHash) inputs.push({ encryptedValue: principalHandle as `0x${string}`, contractAddress: POOL_ADDRESS })
-      if (walletHandle && walletHandle !== ZeroHash) inputs.push({ encryptedValue: walletHandle as `0x${string}`, contractAddress: ASSET_ADDRESS })
+      if (principalHandle && principalHandle !== ZeroHash) inputs.push({ encryptedValue: principalHandle as `0x${string}`, contractAddress: activeMarket.poolAddress })
+      if (walletHandle && walletHandle !== ZeroHash) inputs.push({ encryptedValue: walletHandle as `0x${string}`, contractAddress: activeMarket.assetAddress })
+      if (vaultTvlHandle && vaultTvlHandle !== ZeroHash && account.toLowerCase() === activeMarket.liquidityVaultDeployer.toLowerCase()) {
+        inputs.push({ encryptedValue: vaultTvlHandle as `0x${string}`, contractAddress: activeMarket.liquidityVaultAddress })
+      }
       if (inputs.length === 0) {
         setPrincipal(0n)
         setWalletBalance(0n)
@@ -298,16 +332,16 @@ export function useConfidentialPoolTogether() {
     } catch (error) {
       setOperation({ stage: "error", error: errorMessage(error, "Threshold decryption failed.") })
     }
-  }, [account, permitReady, principalHandle, walletHandle])
+  }, [account, activeMarket, permitReady, principalHandle, vaultTvlHandle, walletHandle])
 
   const approveOperator = useCallback(async () => {
     if (!browserProvider || !correctChain) return
     try {
       setOperation({ kind: "operator", stage: "signature", title: "Approve 30-day pool access" })
       const signer = await browserProvider.getSigner()
-      const asset = new Contract(ASSET_ADDRESS, ASSET_ABI, signer)
+      const asset = new Contract(activeMarket.assetAddress, ASSET_ABI, signer)
       const until = Math.floor(Date.now() / 1000) + 30 * 86_400
-      const tx = await asset.setOperator(POOL_ADDRESS, until)
+      const tx = await asset.setOperator(activeMarket.poolAddress, until)
       setOperation({ kind: "operator", stage: "pending", title: "Recording ERC-7984 operator", hash: tx.hash })
       await waitForSuccess(tx.wait())
       setIsOperator(true)
@@ -316,7 +350,7 @@ export function useConfidentialPoolTogether() {
     } catch (error) {
       setOperation({ kind: "operator", stage: "error", error: errorMessage(error, "Operator approval failed.") })
     }
-  }, [browserProvider, correctChain, refresh])
+  }, [activeMarket, browserProvider, correctChain, refresh])
 
   const transact = useCallback(async (kind: "deposit" | "withdraw", amountInput: string) => {
     if (!account || !browserProvider || !correctChain) return
@@ -332,11 +366,11 @@ export function useConfidentialPoolTogether() {
       setOperation({ kind, stage: "encrypting", title: "Encrypting amount and generating proof" })
       const encrypted = await zamaEncrypt({
         values: [{ value: amount, type: "euint64" }],
-        contractAddress: POOL_ADDRESS,
+        contractAddress: activeMarket.poolAddress,
         userAddress: account,
       })
       const signer = await browserProvider.getSigner()
-      const pool = new Contract(POOL_ADDRESS, POOL_ABI, signer)
+      const pool = new Contract(activeMarket.poolAddress, POOL_ABI, signer)
       const tx = await pool[kind](encrypted.encryptedValues[0], encrypted.inputProof)
       setOperation({ kind, stage: "pending", title: "Confidential transaction pending", hash: tx.hash })
       const receipt = await waitForSuccess(tx.wait())
@@ -350,14 +384,14 @@ export function useConfidentialPoolTogether() {
       setOperation({ kind, stage: "error", error: errorMessage(error, `${kind === "deposit" ? "Deposit" : "Withdrawal"} failed.`) })
       throw error
     }
-  }, [account, browserProvider, correctChain, isOperator, principal, refresh, walletBalance, zamaEncrypt])
+  }, [account, activeMarket, browserProvider, correctChain, isOperator, principal, refresh, walletBalance, zamaEncrypt])
 
   const previewPrize = useCallback(async () => {
     if (!account || !browserProvider || !correctChain || !poolState.claimable) return
     try {
       setOperation({ kind: "preview", stage: "signature", title: "Create encrypted prize preview" })
       const signer = await browserProvider.getSigner()
-      const pool = new Contract(POOL_ADDRESS, POOL_ABI, signer)
+      const pool = new Contract(activeMarket.poolAddress, POOL_ABI, signer)
       const tx = await pool.previewPrize(poolState.drawId)
       setOperation({ kind: "preview", stage: "pending", title: "Computing prize-or-zero", hash: tx.hash })
       await waitForSuccess(tx.wait())
@@ -368,19 +402,19 @@ export function useConfidentialPoolTogether() {
       }
       setPrizeHandle(handle as `0x${string}`)
       setDecryptTarget("prize")
-      setDecryptInputs([{ encryptedValue: handle as `0x${string}`, contractAddress: POOL_ADDRESS }])
+      setDecryptInputs([{ encryptedValue: handle as `0x${string}`, contractAddress: activeMarket.poolAddress }])
       setOperation({ kind: "preview", stage: "preparing", title: "Decrypting private result", hash: tx.hash })
     } catch (error) {
       setOperation({ kind: "preview", stage: "error", error: errorMessage(error, "Prize preview failed.") })
     }
-  }, [account, browserProvider, correctChain, permitReady, poolState.claimable, poolState.drawId])
+  }, [account, activeMarket.poolAddress, browserProvider, correctChain, permitReady, poolState.claimable, poolState.drawId])
 
   const claimPrize = useCallback(async () => {
     if (!browserProvider || !correctChain || prize === undefined || prize === 0n) return
     try {
       setOperation({ kind: "claim", stage: "signature", title: "Confirm private prize claim" })
       const signer = await browserProvider.getSigner()
-      const pool = new Contract(POOL_ADDRESS, POOL_ABI, signer)
+      const pool = new Contract(activeMarket.poolAddress, POOL_ABI, signer)
       const tx = await pool.claimPrize(poolState.drawId)
       setOperation({ kind: "claim", stage: "pending", title: "Prize claim pending", hash: tx.hash })
       const receipt = await waitForSuccess(tx.wait())
@@ -392,40 +426,40 @@ export function useConfidentialPoolTogether() {
     } catch (error) {
       setOperation({ kind: "claim", stage: "error", error: errorMessage(error, "Prize claim failed.") })
     }
-  }, [browserProvider, correctChain, poolState.drawId, prize, refresh])
+  }, [activeMarket.poolAddress, browserProvider, correctChain, poolState.drawId, prize, refresh])
 
   const fundTestnet = useCallback(async () => {
     if (!account || !browserProvider || !correctChain) return
     const amount = parseTokenAmount("1000")
     try {
       const signer = await browserProvider.getSigner()
-      const underlying = new Contract(UNDERLYING_ADDRESS, UNDERLYING_ABI, signer)
-      const wrapper = new Contract(ASSET_ADDRESS, ASSET_ABI, signer)
+      const underlying = new Contract(activeMarket.underlyingAddress, UNDERLYING_ABI, signer)
+      const wrapper = new Contract(activeMarket.assetAddress, ASSET_ABI, signer)
 
-      setOperation({ kind: "fund", stage: "signature", title: "Mint 1,000 official test USDT" })
+      setOperation({ kind: "fund", stage: "signature", title: `Mint 1,000 official test ${activeMarket.underlyingSymbol}` })
       const mintTx = await underlying.mint(account, amount)
-      setOperation({ kind: "fund", stage: "pending", title: "Minting test USDT", hash: mintTx.hash })
+      setOperation({ kind: "fund", stage: "pending", title: `Minting test ${activeMarket.underlyingSymbol}`, hash: mintTx.hash })
       await waitForSuccess(mintTx.wait())
 
-      const allowance = BigInt(await underlying.allowance(account, ASSET_ADDRESS))
+      const allowance = BigInt(await underlying.allowance(account, activeMarket.assetAddress))
       if (allowance < amount) {
-        setOperation({ kind: "fund", stage: "signature", title: "Approve the official cUSDT wrapper" })
-        const approveTx = await underlying.approve(ASSET_ADDRESS, amount)
-        setOperation({ kind: "fund", stage: "pending", title: "Approving test USDT", hash: approveTx.hash })
+        setOperation({ kind: "fund", stage: "signature", title: `Approve the official ${activeMarket.tokenSymbol} wrapper` })
+        const approveTx = await underlying.approve(activeMarket.assetAddress, amount)
+        setOperation({ kind: "fund", stage: "pending", title: `Approving test ${activeMarket.underlyingSymbol}`, hash: approveTx.hash })
         await waitForSuccess(approveTx.wait())
       }
 
-      setOperation({ kind: "fund", stage: "signature", title: "Shield test USDT into cUSDT" })
+      setOperation({ kind: "fund", stage: "signature", title: `Shield test ${activeMarket.underlyingSymbol} into ${activeMarket.tokenSymbol}` })
       const wrapTx = await wrapper.wrap(account, amount)
-      setOperation({ kind: "fund", stage: "pending", title: "Creating confidential cUSDT", hash: wrapTx.hash })
+      setOperation({ kind: "fund", stage: "pending", title: `Creating confidential ${activeMarket.tokenSymbol}`, hash: wrapTx.hash })
       await waitForSuccess(wrapTx.wait())
       setWalletBalance(undefined)
-      setOperation({ kind: "fund", stage: "confirmed", title: "1,000 official test cUSDT ready", hash: wrapTx.hash })
+      setOperation({ kind: "fund", stage: "confirmed", title: `1,000 official test ${activeMarket.tokenSymbol} ready`, hash: wrapTx.hash })
       await refresh(true)
     } catch (error) {
       setOperation({ kind: "fund", stage: "error", error: errorMessage(error, "Testnet funding failed.") })
     }
-  }, [account, browserProvider, correctChain, refresh])
+  }, [account, activeMarket, browserProvider, correctChain, refresh])
 
   const disconnect = useCallback(() => {
     clearCredentials()
@@ -433,6 +467,7 @@ export function useConfidentialPoolTogether() {
     setBrowserProvider(undefined)
     setPrincipal(undefined)
     setWalletBalance(undefined)
+    setUnderlyingBalance(undefined)
     setPrize(undefined)
     setOperation({ stage: "idle" })
   }, [clearCredentials, disconnectAsync])
@@ -441,6 +476,8 @@ export function useConfidentialPoolTogether() {
 
   return useMemo(() => ({
     account,
+    activeMarket,
+    markets: MARKETS,
     walletAvailable,
     walletChainId,
     correctChain,
@@ -448,6 +485,9 @@ export function useConfidentialPoolTogether() {
     activity,
     principal,
     walletBalance,
+    underlyingBalance,
+    vaultTvl,
+    browserProvider,
     prize,
     isOperator,
     permitReady,
@@ -456,6 +496,7 @@ export function useConfidentialPoolTogether() {
     readError,
     operation,
     connect,
+    selectMarket,
     disconnect,
     switchNetwork,
     authorizeReads,
@@ -468,9 +509,9 @@ export function useConfidentialPoolTogether() {
     refresh,
     clearOperation,
   }), [
-    account, walletAvailable, walletChainId, correctChain, poolState, activity, principal, walletBalance,
+    account, activeMarket, walletAvailable, walletChainId, correctChain, poolState, activity, principal, walletBalance, underlyingBalance, vaultTvl, browserProvider,
     prize, isOperator, permitReady, relayerStatus, loading, readError, operation, connect, disconnect,
-    switchNetwork, authorizeReads, revealPosition, approveOperator, transact, previewPrize, claimPrize, fundTestnet, refresh,
+    switchNetwork, authorizeReads, revealPosition, approveOperator, selectMarket, transact, previewPrize, claimPrize, fundTestnet, refresh,
     clearOperation,
   ])
 }

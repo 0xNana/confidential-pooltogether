@@ -17,7 +17,7 @@ import { BrandMark } from "../components/BrandMark"
 import { POOL_ADDRESS } from "../lib/contracts"
 
 const DRAW_STEPS = [
-  { icon: WalletCards, number: "01", title: "Save", copy: "Deposit cUSDT without publishing your amount, balance, or odds." },
+  { icon: WalletCards, number: "01", title: "Save", copy: "Deposit cUSDT or cUSDC without publishing your amount, balance, or odds." },
   { icon: LockKeyhole, number: "02", title: "Seal", copy: "The contract snapshots encrypted positions for the live draw." },
   { icon: Fingerprint, number: "03", title: "Select", copy: "FHE weighted selection runs onchain without exposing the winner." },
   { icon: TicketCheck, number: "04", title: "Claim", copy: "Privately decrypt prize-or-zero and keep your principal available." },
@@ -49,7 +49,7 @@ export function LandingPage() {
             <p className="eyebrow"><LockKeyhole size={14} /> Private prize savings · Live on Sepolia</p>
             <h1 id="landing-title"><span>Confidential</span><em>PoolTogether</em></h1>
             <p className="landing-hero-statement">Your savings enter the draw.<br />Your balance stays out of public view.</p>
-            <p className="landing-lede">Deposit cUSDT, stay liquid, and compete for yield while FHE keeps positions, odds, winners, and prizes encrypted.</p>
+            <p className="landing-lede">Deposit cUSDT or cUSDC, stay liquid, and compete for yield while FHE keeps positions, odds, winners, and prizes encrypted.</p>
             <div className="landing-actions">
               <a className="button button-lime landing-primary-cta" href="/app" data-testid="launch-app">Start saving privately <ArrowRight size={17} /></a>
               <a className="landing-text-link" href={`https://sepolia.etherscan.io/address/${POOL_ADDRESS}#code`} target="_blank" rel="noreferrer">Verify the live contract <ArrowUpRight size={15} /></a>
@@ -86,7 +86,7 @@ export function LandingPage() {
           </div>
           <ol className="landing-steps">
             {DRAW_STEPS.map((step) => (
-              <li key={step.number}>
+              <li className="landing-step-card" key={step.number}>
                 <div><span>{step.number}</span><step.icon size={22} /></div>
                 <h3>{step.title}</h3>
                 <p>{step.copy}</p>
@@ -102,7 +102,7 @@ export function LandingPage() {
             <h2 id="privacy-heading">Private values.<br /><em>Public proof.</em></h2>
             <p>Confidential PoolTogether hides financial values, not the existence of Ethereum activity. The boundary is visible before you connect.</p>
           </div>
-          <div className="landing-privacy-grid">
+          <div className="landing-privacy-grid privacy-book">
             <div className="privacy-list private-list">
               <header><EyeOff size={20} /><span><strong>Encrypted</strong><small>Never published as plaintext</small></span></header>
               <ul>{PRIVATE_FIELDS.map((field) => <li key={field}><Check size={14} /> {field}</li>)}</ul>
@@ -118,7 +118,7 @@ export function LandingPage() {
           <KeyRound size={28} />
           <p className="eyebrow">The live confidential vault</p>
           <h2 id="final-cta-title">Your balance is<br />nobody else&apos;s business.</h2>
-          <p>Connect on Sepolia, fund cUSDT, and enter the encrypted draw.</p>
+          <p>Connect on Sepolia, fund confidential stablecoins, and enter the encrypted draw.</p>
           <a className="button button-lime landing-primary-cta" href="/app">Open Confidential PoolTogether <ArrowRight size={17} /></a>
         </section>
       </main>

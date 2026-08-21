@@ -1,8 +1,8 @@
 const hre = require("hardhat")
-const deployment = require("../deployments/sepolia.json")
+const { selectedToken } = require("./token-config.cjs")
 
-const OFFICIAL_CUSDT = "0x4E7B06D78965594eB5EF5414c357ca21E1554491"
-const OFFICIAL_TEST_USDT = "0xa7dA08FafDC9097Cc0E7D4f113A61e31d7e8e9b0"
+const token = selectedToken()
+const deployment = require(`../deployments/${token.deploymentFile}`)
 
 async function main() {
   const code = await hre.ethers.provider.getCode(deployment.pool)
@@ -21,7 +21,7 @@ async function main() {
   ])
 
   if (asset.toLowerCase() !== deployment.asset.toLowerCase()) throw new Error("Asset address mismatch")
-  if (asset.toLowerCase() !== OFFICIAL_CUSDT.toLowerCase()) throw new Error("Pool is not bound to official Zama cUSDTMock")
+  if (asset.toLowerCase() !== token.asset.toLowerCase()) throw new Error(`Pool is not bound to official Zama ${token.confidentialSymbol}`)
   if (owner.toLowerCase() !== deployment.deployer.toLowerCase()) throw new Error("Owner address mismatch")
   if (pool.interface.hasFunction("snapshotTotal") || pool.interface.hasFunction("finalizeSnapshot")) {
     throw new Error("Deployment exposes the retired public aggregate flow")
@@ -32,10 +32,11 @@ async function main() {
     "function symbol() view returns (string)",
   ], hre.ethers.provider)
   const [underlying, symbol] = await Promise.all([wrapper.underlying(), wrapper.symbol()])
-  if (underlying.toLowerCase() !== OFFICIAL_TEST_USDT.toLowerCase()) throw new Error("Official cUSDT underlying mismatch")
+  if (underlying.toLowerCase() !== token.underlying.toLowerCase()) throw new Error(`Official ${token.symbol} underlying mismatch`)
 
   console.log(JSON.stringify({
     pool: deployment.pool,
+    tokenSymbol: token.symbol,
     bytecodeBytes: (code.length - 2) / 2,
     asset,
     assetSymbol: symbol,

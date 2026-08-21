@@ -2,9 +2,12 @@
   "network": "sepolia",
   "chainId": 11155111,
   "deployer": "0x52F016116508986c6ef2419266075cD7C4C01434",
+  "tokenSymbol": "cUSDT",
+  "underlyingSymbol": "USDT",
   "asset": "0x4E7B06D78965594eB5EF5414c357ca21E1554491",
-  "pool": "0x717256cd7d56C61878D601D1e69429Fa3d88fc91",
+  "underlying": "0xa7dA08FafDC9097Cc0E7D4f113A61e31d7e8e9b0",
+  "pool": "0x4f475e9A84971629d69aC91f0CC4aE102E1f3B4C",
   "privacyModel": "private-aggregate-v3-claim-rollover",
-  "transactionHash": "0xe3ca3955070bc029d75414c9021f902ced91b41da6b7ed2c7961d751502e1e3b",
-  "deployedAt": "2026-08-06T02:00:14.834Z"
+  "transactionHash": "0x0999b8f20e8923827224a76d2799bb324bb4e069cd34578b820adf94b4ec5973",
+  "deployedAt": "2026-08-20T22:24:25.632Z"
 }

@@ -1,4 +1,4 @@
-import { ArrowDownToLine, ArrowRight, ArrowUpRight, Check, KeyRound } from "lucide-react"
+import { ArrowRight, Check, KeyRound } from "lucide-react"
 import { FormEvent, useMemo, useState } from "react"
 import type { ConfidentialPoolTogetherModel } from "../hooks/useConfidentialPoolTogether"
 import { validateActionAmount } from "../lib/action-validation"
@@ -6,14 +6,13 @@ import { formatTokenAmount } from "../lib/fhevm"
 
 type VaultActionProps = Pick<
   ConfidentialPoolTogetherModel,
-  "account" | "correctChain" | "isOperator" | "walletBalance" | "principal" | "poolState" | "operation" | "approveOperator" | "transact"
+  "account" | "activeMarket" | "correctChain" | "isOperator" | "walletBalance" | "principal" | "poolState" | "operation" | "approveOperator" | "transact"
 >
 
 type Mode = "deposit" | "withdraw"
 const FLOW = ["Prepare", "Encrypt + prove", "Wallet signature", "Onchain confirmation"]
 
-export function VaultAction(props: VaultActionProps) {
-  const [mode, setMode] = useState<Mode>("deposit")
+export function VaultAction({ mode, ...props }: VaultActionProps & { mode: Mode }) {
   const [amount, setAmount] = useState("")
   const busy = ["preparing", "encrypting", "signature", "pending"].includes(props.operation.stage)
   const actionBusy = busy && (props.operation.kind === mode || props.operation.kind === "operator")
@@ -40,15 +39,12 @@ export function VaultAction(props: VaultActionProps) {
 
   return (
     <section className="vault-action ruled-panel" aria-labelledby="vault-action-title">
-      <div className="action-switch" role="tablist" aria-label="Vault action">
-        <button type="button" role="tab" aria-selected={mode === "deposit"} className={mode === "deposit" ? "active" : ""} onClick={() => setMode("deposit")}><ArrowDownToLine size={16} /> Deposit</button>
-        <button type="button" role="tab" aria-selected={mode === "withdraw"} className={mode === "withdraw" ? "active" : ""} onClick={() => setMode("withdraw")}><ArrowUpRight size={16} /> Withdraw</button>
-      </div>
       <form onSubmit={(event) => void submit(event)}>
         <div className="action-heading">
-          <div><p className="eyebrow">{mode === "deposit" ? "Enter the live pool" : "Principal remains liquid"}</p><h2 id="vault-action-title">{mode === "deposit" ? "Deposit cUSDT privately" : "Withdraw principal"}</h2></div>
-          <p>{mode === "deposit" ? "The amount is encrypted for the Confidential PoolTogether contract before your transaction is created." : "Your locally revealed principal is checked before the encrypted withdrawal is submitted."}</p>
+          <div><p className="eyebrow">{mode === "deposit" ? "In this vault" : "Your balance"}</p><h2 id="vault-action-title">{mode === "deposit" ? "Deposit" : "Withdraw"}</h2></div>
         </div>
+
+        <p className="action-copy">{mode === "deposit" ? `Add ${props.activeMarket.tokenSymbol} to this vault to join the draw.` : `Take your ${props.activeMarket.tokenSymbol} back out anytime.`}</p>
 
         {mode === "deposit" && props.account && props.correctChain && !props.isOperator && (
           <div className="operator-step">
@@ -60,12 +56,12 @@ export function VaultAction(props: VaultActionProps) {
 
         <label className="amount-entry">
           <span>Amount</span>
-          <div><input name="amount" autoComplete="off" value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="0.00" data-testid="amount-input" /><strong>cUSDT</strong></div>
+          <div><input name="amount" autoComplete="off" value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="0.00" data-testid="amount-input" /><strong>{props.activeMarket.tokenSymbol}</strong></div>
         </label>
         <div className="amount-toolbar">
           <div>{["100", "500", "1000"].map((value) => <button key={value} type="button" onClick={() => setAmount(value)}>{value}</button>)}</div>
           <button type="button" disabled={available === undefined} onClick={() => available !== undefined && setAmount(formatTokenAmount(available, 6))}>Max</button>
-          <span>{mode === "deposit" ? "Wallet" : "Available"} · {available === undefined ? "sealed" : `${formatTokenAmount(available)} cUSDT`}</span>
+          <span>{mode === "deposit" ? "Balance" : "Deposited"}: {available === undefined ? "sealed" : `${formatTokenAmount(available)} ${props.activeMarket.tokenSymbol}`}</span>
         </div>
 
         {actionBusy && props.operation.kind === mode && (
@@ -75,7 +71,7 @@ export function VaultAction(props: VaultActionProps) {
         )}
 
         <button className="button button-orange action-primary" type="submit" disabled={Boolean(disabledReason) || actionBusy} data-testid="submit-action">
-          {actionBusy && props.operation.kind === mode ? props.operation.title : disabledReason ?? (mode === "deposit" ? "Encrypt & deposit" : "Encrypt & withdraw")}
+          {actionBusy && props.operation.kind === mode ? props.operation.title : disabledReason ?? (mode === "deposit" ? "Deposit" : "Withdraw")}
           {actionBusy ? <span className="button-loader" /> : <ArrowRight size={17} />}
         </button>
       </form>

@@ -5,7 +5,7 @@ import { BrandMark } from "./BrandMark"
 
 type PrizeCardProps = Pick<
   ConfidentialPoolTogetherModel,
-  "account" | "correctChain" | "permitReady" | "prize" | "poolState" | "operation" | "connect" | "authorizeReads" | "previewPrize" | "claimPrize"
+  "account" | "activeMarket" | "correctChain" | "permitReady" | "prize" | "poolState" | "operation" | "connect" | "authorizeReads" | "previewPrize" | "claimPrize"
 >
 
 export function PrizeCard(props: PrizeCardProps) {
@@ -25,7 +25,7 @@ export function PrizeCard(props: PrizeCardProps) {
         {claimWindowClosed ? (
           <div className="prize-state"><LockKeyhole size={17} /><span><strong>Claim window closed</strong><small>Encrypted remainder rolls into the next draw</small></span></div>
         ) : !props.poolState.claimable ? (
-          <div className="prize-state"><LockKeyhole size={17} /><span><strong>Awaiting claimable phase</strong><small>Track the live contract phase above</small></span></div>
+          null
         ) : !props.account ? (
           <button className="button prize-button" type="button" onClick={() => void props.connect()}><Wallet size={16} /> Connect to check</button>
         ) : !props.correctChain ? (
@@ -39,7 +39,7 @@ export function PrizeCard(props: PrizeCardProps) {
         ) : (
           <div className="winner-result">
             <span><Trophy size={15} /> Winner result decrypted</span>
-            <strong>{formatTokenAmount(props.prize)} cUSDT</strong>
+            <strong>{formatTokenAmount(props.prize)} {props.activeMarket.tokenSymbol}</strong>
             <button className="button prize-button" type="button" onClick={() => void props.claimPrize()} disabled={prizeBusy}>Claim confidentially <ArrowRight size={15} /></button>
           </div>
         )}

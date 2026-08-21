@@ -9,7 +9,7 @@ export function validateActionAmount(kind: VaultActionKind, value: string, avail
   try {
     amount = parseTokenAmount(value)
   } catch {
-    return "Enter a valid cUSDT amount"
+    return "Enter a valid token amount"
   }
 
   if (available === undefined) {
