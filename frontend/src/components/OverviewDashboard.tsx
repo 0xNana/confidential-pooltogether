@@ -6,7 +6,7 @@ import { PrizeCard } from "./PrizeCard"
 
 type OverviewDashboardProps = Pick<
   ConfidentialPoolTogetherModel,
-  "account" | "activeMarket" | "markets" | "selectMarket" | "correctChain" | "permitReady" | "principal" | "walletBalance" | "prize" | "poolState" | "operation" | "connect" | "switchNetwork" | "authorizeReads" | "revealPosition" | "previewPrize" | "claimPrize"
+  "account" | "activeMarket" | "markets" | "selectMarket" | "correctChain" | "permitReady" | "principal" | "walletBalance" | "prize" | "poolState" | "isEntered" | "operation" | "connect" | "switchNetwork" | "authorizeReads" | "revealPosition" | "enterDraw" | "previewPrize" | "claimPrize"
 > & { onNavigate: (view: "deposit" | "withdraw") => void }
 
 type ChainFilter = "all" | "sepolia"
