@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest"
-import { fetchRecentLogs, recentBlockRanges } from "./rpc-logs"
+import { activityScanStartBlock, fetchRecentLogs, recentBlockRanges } from "./rpc-logs"
+
+describe("activityScanStartBlock", () => {
+  it("uses a bounded recent window when a pruned RPC cannot return the deployment receipt", () => {
+    expect(activityScanStartBlock(undefined, 12_000, 5_000)).toBe(7_001)
+  })
+
+  it("does not scan before a known recent deployment", () => {
+    expect(activityScanStartBlock(11_500, 12_000, 5_000)).toBe(11_500)
+  })
+})
 
 describe("recentBlockRanges", () => {
   it("splits a bounded lookback into newest-first RPC ranges", () => {

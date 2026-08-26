@@ -52,7 +52,7 @@ export function OverviewDashboard(props: OverviewDashboardProps) {
               <div className="vault-list-name"><span className="vault-token-mark">c</span><div><strong>Confidential PoolTogether</strong><small>cUSDT prize vault</small></div></div>
               <div className="vault-list-detail"><small>Chain</small><strong><span className="chain-dot chain-dot-sepolia" /> Sepolia</strong></div>
               <div className="vault-list-detail"><small>Prize pool</small><strong><LockKeyhole size={13} /> Encrypted</strong></div>
-              <div className="vault-list-status"><span><CheckCircle2 size={14} /> {props.activeMarket.id === "cUSDT" ? "Selected" : "Live"}</span><button type="button" onClick={() => openMarketDeposit("cUSDT")}>Deposit <ArrowUpRight size={14} /></button></div>
+              <div className="vault-list-status"><span><CheckCircle2 size={14} /> {props.activeMarket.id === "cUSDT" ? "Selected" : "Live"}</span><button type="button" onClick={() => openMarketDeposit("cUSDT")} data-testid="market-cusdt">Deposit <ArrowUpRight size={14} /></button></div>
             </article>
           )}
           {showSepolia && (
@@ -60,7 +60,7 @@ export function OverviewDashboard(props: OverviewDashboardProps) {
               <div className="vault-list-name"><span className="vault-token-mark">c</span><div><strong>Confidential PoolTogether</strong><small>cUSDC prize vault</small></div></div>
               <div className="vault-list-detail"><small>Chain</small><strong><span className="chain-dot chain-dot-sepolia" /> Sepolia</strong></div>
               <div className="vault-list-detail"><small>Prize pool</small><strong><LockKeyhole size={13} /> Encrypted</strong></div>
-              <div className="vault-list-status"><span><CheckCircle2 size={14} /> {props.activeMarket.id === "cUSDC" ? "Selected" : "Live"}</span><button type="button" onClick={() => openMarketDeposit("cUSDC")}>Deposit <ArrowUpRight size={14} /></button></div>
+              <div className="vault-list-status"><span><CheckCircle2 size={14} /> {props.activeMarket.id === "cUSDC" ? "Selected" : "Live"}</span><button type="button" onClick={() => openMarketDeposit("cUSDC")} data-testid="market-cusdc">Deposit <ArrowUpRight size={14} /></button></div>
             </article>
           )}
         </div>

@@ -64,10 +64,10 @@ export default function VaultApp() {
           <div className="sidebar-footnote"><span className="sidebar-dot" /> <span>Sepolia pool<br />Live contract state</span></div>
         </aside>
 
-        <main className="vault-main">
+        <main className="vault-main" data-workflow-step={model.workflowStep}>
           {model.readError && <div className="read-error" role="alert"><strong>Sepolia read degraded.</strong><span>{model.readError}</span><button type="button" onClick={() => void model.refresh()}>Retry</button></div>}
 
-          {(activeView === "deposit" || activeView === "withdraw") && <DrawStatus poolState={model.poolState} loading={model.loading} />}
+          <DrawStatus {...model} />
 
           {activeView !== "overview" && activeView !== "deposit" && activeView !== "withdraw" && (
             <div className="workspace-heading">

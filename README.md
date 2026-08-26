@@ -18,7 +18,7 @@ This project was built for the Zama Developer Program Mainnet Season 4. It is V5
 - Encrypted deposits, withdrawals, balances, prize previews, and prize claims.
 - Permissionless draw lifecycle methods for closing draws, continuing selection, and opening the next draw.
 - Encrypted weighted winner selection with bounded scan batches.
-- Confidential Liquidity Hunt vaults that track encrypted Earn TVL and fund prize pools from a separately funded reward reserve.
+- Confidential Liquidity Hunt vaults that track encrypted Earn TVL and simulate time-weighted reward accrual from a separately funded reserve.
 - Supabase event indexing for public lifecycle events, with a bounded RPC fallback when the index is unavailable.
 
 ## Product Flow
@@ -144,6 +144,23 @@ Run the browser smoke test:
 npm run browser:smoke
 ```
 
+Run the production dependency gate:
+
+```bash
+npm run audit:prod
+```
+
+Inspect or resume the idempotent two-market live prize cycle over public Sepolia RPCs:
+
+```bash
+npm run contracts:live:cycle
+LIVE_CYCLE_EXECUTE=1 npm run contracts:live:cycle
+```
+
+The first command is chain-read-only and does not require a private key. The execute form requires the current pool owner's `DEPLOYER_PRIVATE_KEY`; it seeds missing principal and direct testnet prize liquidity, advances eligible draw phases, submits preview and claim transactions, withdraws principal, opens the next draw when its deadline permits, and records Etherscan links under `contracts/deployments/live-cycle-*.json`.
+
+GitHub Actions runs lint, frontend tests, contract tests, the production build, the production dependency gate, and the Chrome browser smoke on pull requests and pushes to `main`. Configure `VITE_SEPOLIA_RPC_URL` and `VITE_SEPOLIA_FHE_RPC_URL` repository variables for dedicated CI reads; these browser endpoints are compiled into the public frontend and must not contain privileged credentials. Without them, the application uses its bounded public fallbacks.
+
 ## Contract Deployment
 
 Deploy the default cUSDT pool:
@@ -189,13 +206,15 @@ Deployment manifests are written to `contracts/deployments/` and copied into `fr
 
 | Market | Pool | Reward vault | Draw 1 close |
 | --- | --- | --- | --- |
-| cUSDT | `0x4f475e9A84971629d69aC91f0CC4aE102E1f3B4C` | `0xA2DA21152293683A774B5F1c9D2F03A7B0116500` | `2026-08-27 22:24:24 UTC` |
-| cUSDC | `0x17f8C7703B0BCC665f97C870877f417AAfcc0E9E` | `0xBbCDf44f8192cf253451368C679eAe1eFA58B33D` | `2026-08-27 22:25:12 UTC` |
+| cUSDT | `0x9fCd8e05C9f08FDaB15871178B67055bEc3Cf00F` | `0x5a89824138F7A4da7d07C460e073E36d38745487` | `2026-09-02 11:54:24 UTC` |
+| cUSDC | `0x0Df09628bAdA515D3b0A3AC8945120C14C725819` | `0x4f7fB215FCB6926Cdae216F6E65Cc8ffF7faF185` | `2026-09-02 11:55:00 UTC` |
 
 Verified source:
 
-- cUSDT pool: https://sepolia.etherscan.io/address/0x4f475e9A84971629d69aC91f0CC4aE102E1f3B4C#code
-- cUSDC pool: https://sepolia.etherscan.io/address/0x17f8C7703B0BCC665f97C870877f417AAfcc0E9E#code
+- cUSDT pool: https://sepolia.etherscan.io/address/0x9fCd8e05C9f08FDaB15871178B67055bEc3Cf00F#code
+- cUSDT reward vault: https://sepolia.etherscan.io/address/0x5a89824138F7A4da7d07C460e073E36d38745487#code
+- cUSDC pool: https://sepolia.etherscan.io/address/0x0Df09628bAdA515D3b0A3AC8945120C14C725819#code
+- cUSDC reward vault: https://sepolia.etherscan.io/address/0x4f7fB215FCB6926Cdae216F6E65Cc8ffF7faF185#code
 
 Official Zama Sepolia wrappers:
 
@@ -247,6 +266,6 @@ The indexer stores finalized public events and checkpoints by chain and contract
 
 This code is unaudited and should not custody production funds.
 
-The Liquidity Hunt reward vault is a testnet APY simulator. Rewards come from a separately funded encrypted reserve, not from realized external strategy yield. Before mainnet use, replace the reserve simulator with an audited yield adapter, add broader invariant and fuzz testing, decentralize keeper operations, and complete an external audit.
+The Liquidity Hunt reward vault is a testnet APY simulator. It checkpoints encrypted TVL when principal changes or prizes are funded, accrues a 12% annual target in proportion to elapsed time, and carries unpaid accrual when the reserve is exhausted. Rewards come only from a separately funded encrypted reserve, not from realized external strategy yield. The one-day funding cooldown limits transaction frequency; it does not create a new reward slice. Before mainnet use, replace the reserve simulator with an audited yield adapter, add broader invariant and fuzz testing, decentralize keeper operations, and complete an external audit.
 
-The current winner-selection implementation is intentionally bounded for testnet demonstration and supports at most 256 lifetime participant addresses.
+The current winner-selection implementation is intentionally bounded for testnet demonstration and supports at most 256 active entrants per draw. Enrollment is draw-scoped, so slots are reclaimed when the next draw opens.

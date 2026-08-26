@@ -36,7 +36,7 @@ contract ConfidentialPrizePool is ZamaEthereumConfig, Ownable, ReentrancyGuard {
     mapping(uint64 id => eaddress winner) private _drawWinner;
     mapping(uint64 id => uint64 closesAt) public drawClaimClosesAt;
     mapping(uint64 id => bool ready) public drawClaimable;
-    mapping(address account => bool joined) private _joined;
+    mapping(address account => uint64 id) private _enteredDraw;
     address[] private _participants;
 
     euint64 private _totalPrincipal;
@@ -65,6 +65,7 @@ contract ConfidentialPrizePool is ZamaEthereumConfig, Ownable, ReentrancyGuard {
     event DrawClaimable(uint64 indexed drawId, uint64 claimClosesAt);
     event PrizeRolledOver(uint64 indexed fromDrawId, uint64 indexed toDrawId);
     event PrizeClaimAttempted(address indexed account, uint64 indexed drawId);
+    event DrawEntered(address indexed account, uint64 indexed drawId);
 
     constructor(address initialOwner, IERC7984 confidentialAsset) Ownable(initialOwner) {
         asset = confidentialAsset;
@@ -83,11 +84,7 @@ contract ConfidentialPrizePool is ZamaEthereumConfig, Ownable, ReentrancyGuard {
     /// an ERC-7984 operator by the depositor.
     function deposit(externalEuint64 encryptedAmount, bytes calldata inputProof) external nonReentrant {
         if (phase != DrawPhase.Open) revert DrawNotOpen();
-        if (!_joined[msg.sender]) {
-            if (_participants.length == MAX_PARTICIPANTS) revert ParticipantLimitReached();
-            _joined[msg.sender] = true;
-            _participants.push(msg.sender);
-        }
+        _enterCurrentDraw(msg.sender);
 
         euint64 requested = FHE.fromExternal(encryptedAmount, inputProof);
         FHE.allowThis(requested);
@@ -102,6 +99,14 @@ contract ConfidentialPrizePool is ZamaEthereumConfig, Ownable, ReentrancyGuard {
         FHE.allowThis(_totalPrincipal);
 
         emit DepositRecorded(msg.sender, drawId);
+    }
+
+    /// @notice Enters the current draw without transferring more principal.
+    /// @dev Enrollment is public and draw-scoped. This lets existing depositors
+    /// opt back in after rollover without disclosing whether their balance is zero.
+    function enterDraw() external {
+        if (phase != DrawPhase.Open) revert DrawNotOpen();
+        _enterCurrentDraw(msg.sender);
     }
 
     /// @notice Withdraws principal at any point in the draw lifecycle. An
@@ -257,6 +262,7 @@ contract ConfidentialPrizePool is ZamaEthereumConfig, Ownable, ReentrancyGuard {
         unchecked {
             ++drawId;
         }
+        delete _participants;
         _drawPrize[drawId] = remainingPrize;
         FHE.allowThis(_drawPrize[drawId]);
         scanCursor = 0;
@@ -276,5 +282,17 @@ contract ConfidentialPrizePool is ZamaEthereumConfig, Ownable, ReentrancyGuard {
 
     function participantCount() external view returns (uint256) {
         return _participants.length;
+    }
+
+    function isEntered(address account) external view returns (bool) {
+        return _enteredDraw[account] == drawId;
+    }
+
+    function _enterCurrentDraw(address account) private {
+        if (_enteredDraw[account] == drawId) return;
+        if (_participants.length == MAX_PARTICIPANTS) revert ParticipantLimitReached();
+        _enteredDraw[account] = drawId;
+        _participants.push(account);
+        emit DrawEntered(account, drawId);
     }
 }

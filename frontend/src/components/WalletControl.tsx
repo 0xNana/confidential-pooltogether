@@ -30,7 +30,7 @@ export function WalletControl(props: WalletControlProps) {
 
   if (!props.correctChain) {
     return (
-      <button className="button button-warning" type="button" onClick={() => void props.switchNetwork()}>
+      <button className="button button-warning" type="button" onClick={() => void props.switchNetwork()} data-testid="switch-network">
         <CircleAlert size={16} /> Switch to Sepolia
       </button>
     )

@@ -8,9 +8,9 @@ export function ActivityFeed({ activity, loading }: { activity: ActivityItem[]; 
       {loading ? (
         <div className="activity-skeleton" aria-label="Loading activity"><i /><i /><i /></div>
       ) : activity.length === 0 ? (
-        <div className="empty-activity"><Blocks size={20} /><strong>No pool events yet</strong><p>The deployed contract is live. Deposits and draw lifecycle events will appear here without amounts.</p></div>
+        <div className="empty-activity" data-testid="activity-empty"><Blocks size={20} /><strong>No pool events yet</strong><p>The deployed contract is live. Deposits and draw lifecycle events will appear here without amounts.</p></div>
       ) : (
-        <ol className="activity-list">
+        <ol className="activity-list" data-testid="activity-list">
           {activity.map((item) => (
             <li key={item.id}>
               <span className="activity-mark"><i /></span>

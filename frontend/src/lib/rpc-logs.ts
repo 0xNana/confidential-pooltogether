@@ -12,6 +12,15 @@ type FetchOptions = RangeOptions & {
   limit?: number
 }
 
+export function activityScanStartBlock(
+  deploymentBlock: number | undefined,
+  currentBlock: number,
+  maxLookback = 5_000,
+) {
+  const recentStart = Math.max(0, currentBlock - Math.max(1, maxLookback) + 1)
+  return deploymentBlock === undefined ? recentStart : Math.max(deploymentBlock, recentStart)
+}
+
 export function recentBlockRanges(
   deploymentBlock: number,
   currentBlock: number,

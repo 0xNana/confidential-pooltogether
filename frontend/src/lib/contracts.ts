@@ -13,10 +13,12 @@ export type MarketConfig = {
   assetAddress: Address
   underlyingAddress: Address
   deploymentTx: `0x${string}`
+  deploymentBlock?: number
   liquidityVaultAddress: Address
   liquidityVaultDeployer: Address
   liquidityVaultApyAccounting: boolean
   liquidityVaultRewardSourceConfigured: boolean
+  drawScopedEnrollment: boolean
 }
 
 export const MARKETS: Record<MarketId, MarketConfig> = {
@@ -28,10 +30,12 @@ export const MARKETS: Record<MarketId, MarketConfig> = {
     assetAddress: deployment.asset as Address,
     underlyingAddress: (deployment.underlying ?? "0xa7dA08FafDC9097Cc0E7D4f113A61e31d7e8e9b0") as Address,
     deploymentTx: deployment.transactionHash as `0x${string}`,
+    deploymentBlock: "deploymentBlock" in deployment && typeof deployment.deploymentBlock === "number" ? deployment.deploymentBlock : undefined,
     liquidityVaultAddress: liquidityVault.vault as Address,
     liquidityVaultDeployer: liquidityVault.deployer as Address,
-    liquidityVaultApyAccounting: Boolean(liquidityVault.apyAccounting),
+    liquidityVaultApyAccounting: Boolean(liquidityVault.apyAccounting) && "rewardAccrualModel" in liquidityVault && liquidityVault.rewardAccrualModel === "encrypted-time-weighted-v2",
     liquidityVaultRewardSourceConfigured: Boolean(liquidityVault.rewardSourceConfigured),
+    drawScopedEnrollment: deployment.privacyModel === "private-aggregate-v4-draw-scoped",
   },
   cUSDC: {
     id: "cUSDC",
@@ -41,10 +45,12 @@ export const MARKETS: Record<MarketId, MarketConfig> = {
     assetAddress: deploymentUsdc.asset as Address,
     underlyingAddress: deploymentUsdc.underlying as Address,
     deploymentTx: deploymentUsdc.transactionHash as `0x${string}`,
+    deploymentBlock: "deploymentBlock" in deploymentUsdc && typeof deploymentUsdc.deploymentBlock === "number" ? deploymentUsdc.deploymentBlock : undefined,
     liquidityVaultAddress: liquidityVaultUsdc.vault as Address,
     liquidityVaultDeployer: liquidityVaultUsdc.deployer as Address,
-    liquidityVaultApyAccounting: Boolean(liquidityVaultUsdc.apyAccounting),
+    liquidityVaultApyAccounting: Boolean(liquidityVaultUsdc.apyAccounting) && "rewardAccrualModel" in liquidityVaultUsdc && liquidityVaultUsdc.rewardAccrualModel === "encrypted-time-weighted-v2",
     liquidityVaultRewardSourceConfigured: Boolean(liquidityVaultUsdc.rewardSourceConfigured),
+    drawScopedEnrollment: deploymentUsdc.privacyModel === "private-aggregate-v4-draw-scoped",
   },
 }
 
@@ -60,8 +66,27 @@ export const ASSET_ADDRESS = DEFAULT_MARKET.assetAddress
 export const UNDERLYING_ADDRESS = DEFAULT_MARKET.underlyingAddress
 export const DEPLOYMENT_TX = DEFAULT_MARKET.deploymentTx
 export const TOKEN_DECIMALS = 6
-export const SEPOLIA_RPC_URL =
-  import.meta.env.VITE_SEPOLIA_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com"
+const configuredRpcUrl = import.meta.env.VITE_SEPOLIA_RPC_URL?.trim()
+const configuredFallbackRpcUrls = import.meta.env.VITE_SEPOLIA_FALLBACK_RPC_URLS
+  ?.split(",")
+  .map((url: string) => url.trim())
+  .filter(Boolean) ?? []
+const publicFallbackRpcUrls = [
+  "https://eth-sepolia.api.onfinality.io/public",
+  "https://api.zan.top/eth-sepolia",
+  "https://1rpc.io/sepolia",
+  "https://ethereum-sepolia-rpc.publicnode.com",
+  "https://sepolia.gateway.tenderly.co",
+]
+
+export const HAS_DEDICATED_SEPOLIA_RPC = Boolean(configuredRpcUrl)
+export const SEPOLIA_RPC_URLS = Array.from(new Set([
+  ...(configuredRpcUrl ? [configuredRpcUrl] : []),
+  ...configuredFallbackRpcUrls,
+  ...publicFallbackRpcUrls,
+]))
+export const SEPOLIA_RPC_URL = SEPOLIA_RPC_URLS[0]
+export const SEPOLIA_FHE_RPC_URL = import.meta.env.VITE_SEPOLIA_FHE_RPC_URL?.trim() || "https://ethereum-sepolia-rpc.publicnode.com"
 
 export const POOL_ABI = [
   "function phase() view returns (uint8)",
@@ -70,19 +95,34 @@ export const POOL_ABI = [
   "function drawClaimClosesAt(uint64) view returns (uint64)",
   "function DRAW_PERIOD() view returns (uint64)",
   "function CLAIM_PERIOD() view returns (uint64)",
+  "function MAX_SCAN_BATCH() view returns (uint256)",
   "function scanCursor() view returns (uint256)",
   "function rewardSource() view returns (address)",
   "function participantCount() view returns (uint256)",
+  "function isEntered(address) view returns (bool)",
   "function drawClaimable(uint64) view returns (bool)",
   "function principalOf(address) view returns (bytes32)",
   "function prizePreviewOf(uint64,address) view returns (bytes32)",
   "function setRewardSource(address)",
   "function receivePrizeFromSource(bytes32)",
   "function deposit(bytes32,bytes)",
+  "function enterDraw()",
   "function withdraw(bytes32,bytes)",
   "function previewPrize(uint64)",
   "function claimPrize(uint64)",
+  "function closeDraw()",
+  "function continueSelection(uint256)",
+  "function openNextDraw()",
+  "error DrawNotOpen()",
+  "error DrawNotSelecting()",
+  "error DrawNotClaimable()",
+  "error DrawStillOpen(uint64 closesAt)",
+  "error DrawClaimWindowClosed(uint64 closesAt)",
+  "error EmptyPool()",
+  "error ParticipantLimitReached()",
+  "error InvalidBatchSize()",
   "event DepositRecorded(address indexed account, uint64 indexed drawId)",
+  "event DrawEntered(address indexed account, uint64 indexed drawId)",
   "event WithdrawalRecorded(address indexed account, uint64 indexed drawId)",
   "event PrizeFunded(uint64 indexed drawId)",
   "event DrawOpened(uint64 indexed drawId, uint64 closesAt)",
@@ -97,12 +137,14 @@ export const LIQUIDITY_VAULT_ABI = [
   "function asset() view returns (address)",
   "function MATURITY_PERIOD() view returns (uint64)",
   "function REWARD_FUNDING_COOLDOWN() view returns (uint64)",
+  "function REWARD_ACCRUAL_PERIOD() view returns (uint64)",
   "function TARGET_APY_BPS() view returns (uint64)",
-  "function PROGRAM_REWARD_BPS() view returns (uint64)",
+  "function lastAccruedAt() view returns (uint64)",
   "function maturityOf(address) view returns (uint64)",
   "function principalOf(address) view returns (bytes32)",
   "function totalPrincipal() view returns (bytes32)",
   "function rewardReserve() view returns (bytes32)",
+  "function accruedReward() view returns (bytes32)",
   "function fundRewards(bytes32,bytes)",
   "function fundPrizePool(address)",
   "function deposit(bytes32,bytes)",

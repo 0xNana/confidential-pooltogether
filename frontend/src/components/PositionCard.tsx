@@ -1,15 +1,19 @@
-import { Eye, Fingerprint, KeyRound, LockKeyhole, ShieldCheck, Wallet } from "lucide-react"
+import { Eye, Fingerprint, KeyRound, LockKeyhole, ShieldCheck, TicketCheck, Wallet } from "lucide-react"
 import type { ConfidentialPoolTogetherModel } from "../hooks/useConfidentialPoolTogether"
 import { formatTokenAmount } from "../lib/fhevm"
 
 type PositionCardProps = Pick<
   ConfidentialPoolTogetherModel,
-  "account" | "activeMarket" | "correctChain" | "permitReady" | "principal" | "walletBalance" | "operation" | "connect" | "switchNetwork" | "authorizeReads" | "revealPosition"
+  "account" | "activeMarket" | "correctChain" | "permitReady" | "principal" | "walletBalance" | "poolState" | "isEntered" | "operation" | "connect" | "switchNetwork" | "authorizeReads" | "revealPosition" | "enterDraw"
 >
 
 export function PositionCard(props: PositionCardProps) {
   const decrypting = props.operation.stage === "preparing" && props.operation.title?.includes("decryption")
   const authorizing = props.operation.kind === "permit" && ["preparing", "signature"].includes(props.operation.stage)
+  const entering = props.operation.kind === "entry" && ["signature", "pending"].includes(props.operation.stage)
+  const entryState = props.activeMarket.drawScopedEnrollment
+    ? props.isEntered
+    : props.principal === undefined ? undefined : props.principal > 0n
   return (
     <section className="position-card ruled-panel" aria-labelledby="position-title">
       <header className="panel-titlebar">
@@ -37,8 +41,18 @@ export function PositionCard(props: PositionCardProps) {
           <div className="ledger-grid">
             <LedgerValue label="Your balance" value={props.principal === undefined ? undefined : `${formatTokenAmount(props.principal)} ${props.activeMarket.tokenSymbol}`} />
             <LedgerValue label="Wallet" value={props.walletBalance === undefined ? undefined : `${formatTokenAmount(props.walletBalance)} ${props.activeMarket.tokenSymbol}`} />
-            <div className="ledger-value ledger-private"><span><LockKeyhole size={12} /> Draw entry</span><strong>{props.principal === undefined ? "—" : props.principal > 0n ? "Active" : "Inactive"}</strong><small>Odds remain encrypted with the pool</small></div>
+            <div className="ledger-value ledger-private"><span><LockKeyhole size={12} /> Draw entry</span><strong>{entryState === undefined ? "—" : entryState ? "Entered" : "Not entered"}</strong><small>Draw #{props.poolState.drawId || "—"}</small></div>
           </div>
+
+          {props.activeMarket.drawScopedEnrollment && props.poolState.phase === 0 && props.isEntered === false && (
+            <div className="permit-callout authorized">
+              <TicketCheck size={19} />
+              <div><strong>Entry open for draw #{props.poolState.drawId}</strong><p>Your existing confidential principal stays in place.</p></div>
+              <button className="button button-teal" type="button" onClick={() => void props.enterDraw()} disabled={entering} data-testid="enter-draw">
+                <TicketCheck size={15} /> {entering ? "Check wallet" : "Enter draw"}
+              </button>
+            </div>
+          )}
 
           {!props.permitReady ? (
             <div className="permit-callout">

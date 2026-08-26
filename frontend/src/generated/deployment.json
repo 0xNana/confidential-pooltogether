@@ -6,8 +6,13 @@
   "underlyingSymbol": "USDT",
   "asset": "0x4E7B06D78965594eB5EF5414c357ca21E1554491",
   "underlying": "0xa7dA08FafDC9097Cc0E7D4f113A61e31d7e8e9b0",
-  "pool": "0x4f475e9A84971629d69aC91f0CC4aE102E1f3B4C",
-  "privacyModel": "private-aggregate-v3-claim-rollover",
-  "transactionHash": "0x0999b8f20e8923827224a76d2799bb324bb4e069cd34578b820adf94b4ec5973",
-  "deployedAt": "2026-08-20T22:24:25.632Z"
+  "pool": "0x9fCd8e05C9f08FDaB15871178B67055bEc3Cf00F",
+  "privacyModel": "private-aggregate-v4-draw-scoped",
+  "drawScopedEnrollment": true,
+  "rewardSource": "0x5a89824138F7A4da7d07C460e073E36d38745487",
+  "rewardSourceConfigured": true,
+  "rewardSourceTransactionHash": "0x5416d8984adb42e135208b01d6851b65b977558b394cfd6e8406fe574d725219",
+  "transactionHash": "0x5e5e21d2ef9b7fd0456ec44ed682e8879a0ad08be1bf544e66550d271e362587",
+  "deploymentBlock": 11570710,
+  "deployedAt": "2026-08-26T11:54:37.642Z"
 }

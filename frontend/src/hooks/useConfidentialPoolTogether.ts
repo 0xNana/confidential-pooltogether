@@ -4,6 +4,7 @@ import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } fro
 import {
   BrowserProvider,
   Contract,
+  FetchRequest,
   Interface,
   JsonRpcProvider,
   ZeroHash,
@@ -19,12 +20,12 @@ import {
   MARKETS,
   POOL_ABI,
   LIQUIDITY_VAULT_ABI,
-  SEPOLIA_RPC_URL,
+  SEPOLIA_RPC_URLS,
   UNDERLYING_ABI,
   type Address,
   type MarketId,
 } from "../lib/contracts"
-import { fetchRecentLogs } from "../lib/rpc-logs"
+import { activityScanStartBlock, fetchRecentLogs } from "../lib/rpc-logs"
 import {
   fetchIndexedActivity,
   subscribeToIndexedActivity,
@@ -32,6 +33,9 @@ import {
 } from "../lib/supabase-events"
 import { parseTokenAmount } from "../lib/fhevm"
 import { validateActionAmount } from "../lib/action-validation"
+import { deriveDrawLifecycle } from "../lib/draw-lifecycle"
+import { isTransientProviderError, reportDiagnostic, retryTransient, toUserError } from "../lib/user-errors"
+import { deriveVaultWorkflowStep } from "../lib/vault-workflow"
 
 export type PoolState = {
   drawId: number
@@ -50,14 +54,23 @@ export type ActivityItem = PublicActivityItem
 export type OperationStage = "idle" | "preparing" | "encrypting" | "signature" | "pending" | "confirmed" | "error"
 
 export type OperationState = {
-  kind?: "deposit" | "withdraw" | "operator" | "preview" | "claim" | "permit" | "fund"
+  kind?: "deposit" | "withdraw" | "operator" | "preview" | "claim" | "permit" | "fund" | "lifecycle" | "entry"
   stage: OperationStage
   title?: string
   hash?: string
   error?: string
 }
 
-const readProvider = new JsonRpcProvider(SEPOLIA_RPC_URL, CHAIN_ID, { staticNetwork: true })
+const readProviders = SEPOLIA_RPC_URLS.map((url) => {
+  const request = new FetchRequest(url)
+  request.timeout = 4_000
+  return new JsonRpcProvider(request, CHAIN_ID, {
+    staticNetwork: true,
+    batchMaxCount: 20,
+    batchStallTime: 10,
+  })
+})
+let preferredReadProvider = 0
 const poolInterface = new Interface(POOL_ABI)
 const cachedDeploymentBlocks: Partial<Record<MarketId, number>> = {}
 const initialPoolState: PoolState = {
@@ -72,8 +85,9 @@ const initialPoolState: PoolState = {
 }
 
 export function useConfidentialPoolTogether() {
-  const { address: connectedAddress } = useAccount()
-  const walletChainId = useChainId()
+  const { address: connectedAddress, chainId: connectedChainId } = useAccount()
+  const configuredChainId = useChainId()
+  const walletChainId = connectedChainId ?? configuredChainId
   const { connectAsync, connectors } = useConnect()
   const { disconnectAsync } = useDisconnect()
   const { switchChainAsync } = useSwitchChain()
@@ -96,6 +110,7 @@ export function useConfidentialPoolTogether() {
   const [vaultTvl, setVaultTvl] = useState<bigint>()
   const [prize, setPrize] = useState<bigint>()
   const [isOperator, setIsOperator] = useState(false)
+  const [isEntered, setIsEntered] = useState<boolean>()
   const [decryptInputs, setDecryptInputs] = useState<Array<{ encryptedValue: `0x${string}`; contractAddress: Address }>>([])
   const [decryptTarget, setDecryptTarget] = useState<"position" | "prize">()
   const [loading, setLoading] = useState(true)
@@ -108,9 +123,22 @@ export function useConfidentialPoolTogether() {
   const decryptQuery = useDecryptValues(decryptInputs, { enabled: decryptInputs.length > 0 })
   const permitReady = permitQuery.data ?? false
   const relayerStatus: "idle" | "loading" | "ready" | "error" = account && correctChain ? "ready" : "idle"
+  const workflowStep = deriveVaultWorkflowStep({
+    account: Boolean(account),
+    correctChain,
+    permitReady,
+    isOperator,
+    principal,
+    prize,
+    phase: poolState.phase,
+    deadlineReached: poolState.drawClosesAt > 0 && Math.floor(Date.now() / 1000) >= poolState.drawClosesAt,
+    claimable: poolState.claimable,
+  })
 
   const selectMarket = useCallback((marketId: MarketId) => {
     setActiveMarketId(marketId)
+    setLoading(true)
+    setReadError(undefined)
     setPrincipal(undefined)
     setWalletBalance(undefined)
     setUnderlyingBalance(undefined)
@@ -120,6 +148,7 @@ export function useConfidentialPoolTogether() {
     setDecryptInputs([])
     setDecryptTarget(undefined)
     setIsOperator(false)
+    setIsEntered(undefined)
   }, [])
 
   const refreshActivity = useCallback(async () => {
@@ -129,30 +158,36 @@ export function useConfidentialPoolTogether() {
         setActivity(indexed)
         return
       }
-    } catch {
+    } catch (error) {
+      reportDiagnostic("activity-index", error)
       // A configured index may be temporarily unavailable; use a bounded RPC fallback.
     }
 
     try {
       if (cachedDeploymentBlocks[activeMarket.id] === undefined) {
-        const deployReceipt = await readProvider.getTransactionReceipt(activeMarket.deploymentTx)
-        cachedDeploymentBlocks[activeMarket.id] = deployReceipt?.blockNumber
+        if (activeMarket.deploymentBlock !== undefined) {
+          cachedDeploymentBlocks[activeMarket.id] = activeMarket.deploymentBlock
+        } else {
+          const deployReceipt = await withReadProvider((provider) => provider.getTransactionReceipt(activeMarket.deploymentTx))
+          cachedDeploymentBlocks[activeMarket.id] = deployReceipt?.blockNumber
+        }
         if (cachedDeploymentBlocks[activeMarket.id] !== undefined) {
           setPoolState((previous) => ({ ...previous, deploymentBlock: cachedDeploymentBlocks[activeMarket.id] }))
         }
       }
 
+      const currentBlock = await withReadProvider((provider) => provider.getBlockNumber())
       const deploymentBlock = cachedDeploymentBlocks[activeMarket.id]
-      if (deploymentBlock === undefined) return
-      const currentBlock = await readProvider.getBlockNumber()
+      const scanStartBlock = activityScanStartBlock(deploymentBlock, currentBlock)
       const recent = await fetchRecentLogs(
-        (range) => readProvider.getLogs({ address: activeMarket.poolAddress, ...range }),
-        deploymentBlock,
+        (range) => withReadProvider((provider) => provider.getLogs({ address: activeMarket.poolAddress, ...range })),
+        scanStartBlock,
         currentBlock,
         { chunkSize: 500, maxLookback: 5_000, limit: 7 },
       )
       if (recent.complete || recent.logs.length > 0) setActivity(parseActivity(recent.logs).slice(0, 7))
-    } catch {
+    } catch (error) {
+      reportDiagnostic("activity-rpc", error)
       // Activity metadata is best-effort and must not invalidate live pool state.
     }
   }, [activeMarket])
@@ -160,61 +195,80 @@ export function useConfidentialPoolTogether() {
   const refresh = useCallback(async (includeActivity = false) => {
     setReadError(undefined)
     try {
-      const pool = new Contract(activeMarket.poolAddress, POOL_ABI, readProvider)
-      const asset = new Contract(activeMarket.assetAddress, ASSET_ABI, readProvider)
-      const underlying = new Contract(activeMarket.underlyingAddress, UNDERLYING_ABI, readProvider)
-      const liquidityVault = new Contract(activeMarket.liquidityVaultAddress, LIQUIDITY_VAULT_ABI, readProvider)
-      const [drawIdRaw, phaseRaw, drawClosesAtRaw, participantCountRaw, scanCursorRaw] =
-        await Promise.all([
+      const snapshot = await retryTransient(() => withReadProvider(async (readProvider) => {
+        const pool = new Contract(activeMarket.poolAddress, POOL_ABI, readProvider)
+        const asset = new Contract(activeMarket.assetAddress, ASSET_ABI, readProvider)
+        const underlying = new Contract(activeMarket.underlyingAddress, UNDERLYING_ABI, readProvider)
+        const liquidityVault = new Contract(activeMarket.liquidityVaultAddress, LIQUIDITY_VAULT_ABI, readProvider)
+        const [drawIdRaw, phaseRaw, drawClosesAtRaw, participantCountRaw, scanCursorRaw] = await Promise.all([
           pool.drawId(),
           pool.phase(),
           pool.drawClosesAt(),
           pool.participantCount(),
           pool.scanCursor(),
         ])
-      const drawId = Number(drawIdRaw)
-      const phase = Number(phaseRaw)
-      const [claimableRaw, claimClosesAtRaw] = await Promise.all([
-        pool.drawClaimable(drawId),
-        pool.drawClaimClosesAt(drawId),
-      ])
-      const claimClosesAt = Number(claimClosesAtRaw)
-      const claimable = Boolean(claimableRaw) && claimClosesAt > Math.floor(Date.now() / 1000)
+        const drawId = Number(drawIdRaw)
+        const phase = Number(phaseRaw)
+        const [claimableRaw, claimClosesAtRaw] = await Promise.all([
+          pool.drawClaimable(drawId),
+          pool.drawClaimClosesAt(drawId),
+        ])
+        const privateState = account
+          ? await Promise.all([
+              pool.principalOf(account),
+              asset.confidentialBalanceOf(account),
+              underlying.balanceOf(account),
+              asset.isOperator(account, activeMarket.poolAddress),
+              liquidityVault.totalPrincipal(),
+              activeMarket.drawScopedEnrollment ? pool.isEntered(account) : undefined,
+            ])
+          : undefined
+        return {
+          drawId,
+          phase,
+          drawClosesAt: Number(drawClosesAtRaw),
+          participantCount: Number(participantCountRaw),
+          scanCursor: Number(scanCursorRaw),
+          claimClosesAt: Number(claimClosesAtRaw),
+          claimableRaw: Boolean(claimableRaw),
+          privateState,
+        }
+      }), { attempts: 2 })
+
+      const claimable = snapshot.claimableRaw && snapshot.claimClosesAt > Math.floor(Date.now() / 1000)
       setPoolState({
-        drawId,
-        phase,
-        phaseLabel: DRAW_PHASES[phase] ?? "Unknown",
-        drawClosesAt: Number(drawClosesAtRaw),
-        claimClosesAt,
-        participantCount: Number(participantCountRaw),
-        scanCursor: Number(scanCursorRaw),
+        drawId: snapshot.drawId,
+        phase: snapshot.phase,
+        phaseLabel: DRAW_PHASES[snapshot.phase] ?? "Unknown",
+        drawClosesAt: snapshot.drawClosesAt,
+        claimClosesAt: snapshot.claimClosesAt,
+        participantCount: snapshot.participantCount,
+        scanCursor: snapshot.scanCursor,
         claimable,
         deploymentBlock: cachedDeploymentBlocks[activeMarket.id],
       })
 
-      if (account) {
-        const [nextPrincipalHandle, nextWalletHandle, nextUnderlyingBalance, operator] = await Promise.all([
-          pool.principalOf(account),
-          asset.confidentialBalanceOf(account),
-          underlying.balanceOf(account),
-          asset.isOperator(account, activeMarket.poolAddress),
-        ])
-        setVaultTvlHandle(String(await liquidityVault.totalPrincipal()))
+      if (snapshot.privateState) {
+        const [nextPrincipalHandle, nextWalletHandle, nextUnderlyingBalance, operator, nextVaultTvlHandle, entered] = snapshot.privateState
+        setVaultTvlHandle(String(nextVaultTvlHandle))
         setPrincipalHandle(String(nextPrincipalHandle))
         setWalletHandle(String(nextWalletHandle))
         setUnderlyingBalance(BigInt(nextUnderlyingBalance))
         setIsOperator(Boolean(operator))
+        setIsEntered(entered === undefined ? undefined : Boolean(entered))
       } else {
         setPrincipalHandle(undefined)
         setWalletHandle(undefined)
         setVaultTvlHandle(undefined)
         setUnderlyingBalance(undefined)
         setIsOperator(false)
+        setIsEntered(undefined)
       }
 
       if (includeActivity) await refreshActivity()
     } catch (error) {
-      setReadError(errorMessage(error, "Could not read the Sepolia deployment."))
+      reportDiagnostic("pool-read", error)
+      setReadError(toUserError(error, "Could not read the Sepolia deployment."))
     } finally {
       setLoading(false)
     }
@@ -249,6 +303,7 @@ export function useConfidentialPoolTogether() {
     setPrizeHandle(undefined)
     setDecryptInputs([])
     setDecryptTarget(undefined)
+    setIsEntered(undefined)
   }, [account])
 
   useEffect(() => {
@@ -272,7 +327,7 @@ export function useConfidentialPoolTogether() {
 
   useEffect(() => {
     if (!decryptTarget || !decryptQuery.error) return
-    setOperation({ stage: "error", error: errorMessage(decryptQuery.error, "Threshold decryption failed.") })
+    setOperation({ stage: "error", error: toUserError(decryptQuery.error, "Threshold decryption failed.") })
     setDecryptInputs([])
     setDecryptTarget(undefined)
   }, [decryptQuery.error, decryptTarget])
@@ -287,7 +342,7 @@ export function useConfidentialPoolTogether() {
       await connectAsync({ connector: connectors[0] })
       setOperation({ stage: "idle" })
     } catch (error) {
-      setOperation({ stage: "error", error: errorMessage(error, "Wallet connection was cancelled.") })
+      setOperation({ stage: "error", error: toUserError(error, "Wallet connection was cancelled.") })
     }
   }, [connectAsync, connectors, walletAvailable])
 
@@ -295,7 +350,7 @@ export function useConfidentialPoolTogether() {
     try {
       await switchChainAsync({ chainId: CHAIN_ID })
     } catch (error) {
-      setOperation({ stage: "error", error: errorMessage(error, "Switch to Sepolia in your wallet.") })
+      setOperation({ stage: "error", error: toUserError(error, "Switch to Sepolia in your wallet.") })
     }
   }, [switchChainAsync])
 
@@ -307,7 +362,7 @@ export function useConfidentialPoolTogether() {
       await permitQuery.refetch()
       setOperation({ kind: "permit", stage: "confirmed", title: "Private session authorized" })
     } catch (error) {
-      setOperation({ kind: "permit", stage: "error", error: errorMessage(error, "Could not authorize private reads.") })
+      setOperation({ kind: "permit", stage: "error", error: toUserError(error, "Could not authorize private reads.") })
     }
   }, [account, activeMarket, correctChain, grantPermit, permitQuery])
 
@@ -330,7 +385,7 @@ export function useConfidentialPoolTogether() {
       setDecryptTarget("position")
       setDecryptInputs(inputs)
     } catch (error) {
-      setOperation({ stage: "error", error: errorMessage(error, "Threshold decryption failed.") })
+      setOperation({ stage: "error", error: toUserError(error, "Threshold decryption failed.") })
     }
   }, [account, activeMarket, permitReady, principalHandle, vaultTvlHandle, walletHandle])
 
@@ -348,9 +403,27 @@ export function useConfidentialPoolTogether() {
       setOperation({ kind: "operator", stage: "confirmed", title: "Pool access approved", hash: tx.hash })
       await refresh(true)
     } catch (error) {
-      setOperation({ kind: "operator", stage: "error", error: errorMessage(error, "Operator approval failed.") })
+      setOperation({ kind: "operator", stage: "error", error: toUserError(error, "Operator approval failed.") })
     }
   }, [activeMarket, browserProvider, correctChain, refresh])
+
+  const enterDraw = useCallback(async () => {
+    if (!account || !browserProvider || !correctChain || !activeMarket.drawScopedEnrollment || poolState.phase !== 0 || isEntered) return
+    try {
+      setOperation({ kind: "entry", stage: "signature", title: `Enter draw #${poolState.drawId}` })
+      const signer = await browserProvider.getSigner()
+      const pool = new Contract(activeMarket.poolAddress, POOL_ABI, signer)
+      const tx = await pool.enterDraw()
+      setOperation({ kind: "entry", stage: "pending", title: "Draw entry pending", hash: tx.hash })
+      const receipt = await waitForSuccess(tx.wait())
+      recordActivityFromReceipt(receipt, setActivity)
+      setIsEntered(true)
+      setOperation({ kind: "entry", stage: "confirmed", title: `Entered draw #${poolState.drawId}`, hash: tx.hash })
+      await refresh(true)
+    } catch (error) {
+      setOperation({ kind: "entry", stage: "error", error: toUserError(error, "Could not enter this draw.") })
+    }
+  }, [account, activeMarket, browserProvider, correctChain, isEntered, poolState.drawId, poolState.phase, refresh])
 
   const transact = useCallback(async (kind: "deposit" | "withdraw", amountInput: string) => {
     if (!account || !browserProvider || !correctChain) return
@@ -381,7 +454,7 @@ export function useConfidentialPoolTogether() {
       setOperation({ kind, stage: "confirmed", title: `Encrypted ${kind === "deposit" ? "deposit" : "withdrawal"} confirmed`, hash: tx.hash })
       await refresh(true)
     } catch (error) {
-      setOperation({ kind, stage: "error", error: errorMessage(error, `${kind === "deposit" ? "Deposit" : "Withdrawal"} failed.`) })
+      setOperation({ kind, stage: "error", error: toUserError(error, `${kind === "deposit" ? "Deposit" : "Withdrawal"} failed.`) })
       throw error
     }
   }, [account, activeMarket, browserProvider, correctChain, isOperator, principal, refresh, walletBalance, zamaEncrypt])
@@ -405,7 +478,7 @@ export function useConfidentialPoolTogether() {
       setDecryptInputs([{ encryptedValue: handle as `0x${string}`, contractAddress: activeMarket.poolAddress }])
       setOperation({ kind: "preview", stage: "preparing", title: "Decrypting private result", hash: tx.hash })
     } catch (error) {
-      setOperation({ kind: "preview", stage: "error", error: errorMessage(error, "Prize preview failed.") })
+      setOperation({ kind: "preview", stage: "error", error: toUserError(error, "Prize preview failed.") })
     }
   }, [account, activeMarket.poolAddress, browserProvider, correctChain, permitReady, poolState.claimable, poolState.drawId])
 
@@ -424,9 +497,47 @@ export function useConfidentialPoolTogether() {
       setOperation({ kind: "claim", stage: "confirmed", title: "Prize transferred confidentially", hash: tx.hash })
       await refresh(true)
     } catch (error) {
-      setOperation({ kind: "claim", stage: "error", error: errorMessage(error, "Prize claim failed.") })
+      setOperation({ kind: "claim", stage: "error", error: toUserError(error, "Prize claim failed.") })
     }
   }, [activeMarket.poolAddress, browserProvider, correctChain, poolState.drawId, prize, refresh])
+
+  const advanceDraw = useCallback(async () => {
+    if (!browserProvider || !correctChain) return
+    const lifecycle = deriveDrawLifecycle(poolState, Math.floor(Date.now() / 1000))
+    if (!lifecycle.ready) {
+      setOperation({ kind: "lifecycle", stage: "error", error: lifecycle.reason })
+      return
+    }
+
+    try {
+      const title = lifecycle.kind === "close"
+        ? "Confirm draw close"
+        : lifecycle.kind === "continue"
+          ? `Advance ${lifecycle.batchSize} selection accounts`
+          : "Confirm next draw"
+      setOperation({ kind: "lifecycle", stage: "signature", title })
+      const signer = await browserProvider.getSigner()
+      const pool = new Contract(activeMarket.poolAddress, POOL_ABI, signer)
+      const tx = lifecycle.kind === "close"
+        ? await pool.closeDraw()
+        : lifecycle.kind === "continue"
+          ? await pool.continueSelection(lifecycle.batchSize)
+          : await pool.openNextDraw()
+      setOperation({ kind: "lifecycle", stage: "pending", title: "Draw lifecycle transaction pending", hash: tx.hash })
+      const receipt = await waitForSuccess(tx.wait())
+      recordActivityFromReceipt(receipt, setActivity)
+      const confirmedTitle = lifecycle.kind === "close"
+        ? "Winner selection started"
+        : lifecycle.kind === "continue"
+          ? "Winner selection advanced"
+          : "Next draw opened"
+      setOperation({ kind: "lifecycle", stage: "confirmed", title: confirmedTitle, hash: tx.hash })
+      await refresh(true)
+    } catch (error) {
+      reportDiagnostic("draw-lifecycle", error)
+      setOperation({ kind: "lifecycle", stage: "error", error: toUserError(error, "Could not advance the draw. Refresh and retry.") })
+    }
+  }, [activeMarket.poolAddress, browserProvider, correctChain, poolState, refresh])
 
   const fundTestnet = useCallback(async () => {
     if (!account || !browserProvider || !correctChain) return
@@ -457,7 +568,7 @@ export function useConfidentialPoolTogether() {
       setOperation({ kind: "fund", stage: "confirmed", title: `1,000 official test ${activeMarket.tokenSymbol} ready`, hash: wrapTx.hash })
       await refresh(true)
     } catch (error) {
-      setOperation({ kind: "fund", stage: "error", error: errorMessage(error, "Testnet funding failed.") })
+      setOperation({ kind: "fund", stage: "error", error: toUserError(error, "Testnet funding failed.") })
     }
   }, [account, activeMarket, browserProvider, correctChain, refresh])
 
@@ -469,6 +580,7 @@ export function useConfidentialPoolTogether() {
     setWalletBalance(undefined)
     setUnderlyingBalance(undefined)
     setPrize(undefined)
+    setIsEntered(undefined)
     setOperation({ stage: "idle" })
   }, [clearCredentials, disconnectAsync])
 
@@ -490,11 +602,13 @@ export function useConfidentialPoolTogether() {
     browserProvider,
     prize,
     isOperator,
+    isEntered,
     permitReady,
     relayerStatus,
     loading,
     readError,
     operation,
+    workflowStep,
     connect,
     selectMarket,
     disconnect,
@@ -502,16 +616,18 @@ export function useConfidentialPoolTogether() {
     authorizeReads,
     revealPosition,
     approveOperator,
+    enterDraw,
     transact,
     previewPrize,
     claimPrize,
+    advanceDraw,
     fundTestnet,
     refresh,
     clearOperation,
   }), [
     account, activeMarket, walletAvailable, walletChainId, correctChain, poolState, activity, principal, walletBalance, underlyingBalance, vaultTvl, browserProvider,
-    prize, isOperator, permitReady, relayerStatus, loading, readError, operation, connect, disconnect,
-    switchNetwork, authorizeReads, revealPosition, approveOperator, selectMarket, transact, previewPrize, claimPrize, fundTestnet, refresh,
+    prize, isOperator, isEntered, permitReady, relayerStatus, loading, readError, operation, workflowStep, connect, disconnect,
+    switchNetwork, authorizeReads, revealPosition, approveOperator, enterDraw, selectMarket, transact, previewPrize, claimPrize, advanceDraw, fundTestnet, refresh,
     clearOperation,
   ])
 }
@@ -521,6 +637,7 @@ export type ConfidentialPoolTogetherModel = ReturnType<typeof useConfidentialPoo
 function parseActivity(logs: Log[]): ActivityItem[] {
   const labels: Record<string, string> = {
     DepositRecorded: "Encrypted deposit accepted",
+    DrawEntered: "Saver entered the draw",
     WithdrawalRecorded: "Principal withdrawal recorded",
     PrizeFunded: "Yield entered the prize reserve",
     DrawOpened: "New private draw opened",
@@ -568,16 +685,19 @@ async function waitForSuccess(receiptPromise: Promise<TransactionReceipt | null>
   return receipt
 }
 
-function errorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error) {
-    const message = error.message
-      .replace(/\s*\(action=.*$/s, "")
-      .replace(/^execution reverted:\s*/i, "")
-    if (/user rejected|rejected the request|ACTION_REJECTED/i.test(message)) return "Request cancelled in wallet."
-    if (/insufficient funds/i.test(message)) return "Not enough Sepolia ETH to pay gas."
-    if (/DrawNotOpen/i.test(message)) return "Deposits are paused while this draw is closing."
-    if (/DrawNotClaimable/i.test(message)) return "This draw is not claimable yet."
-    return message || fallback
+async function withReadProvider<T>(operation: (provider: JsonRpcProvider) => Promise<T>): Promise<T> {
+  let lastError: unknown
+  for (let offset = 0; offset < readProviders.length; offset += 1) {
+    const index = (preferredReadProvider + offset) % readProviders.length
+    try {
+      const result = await operation(readProviders[index])
+      preferredReadProvider = index
+      return result
+    } catch (error) {
+      lastError = error
+      if (!isTransientProviderError(error)) throw error
+      reportDiagnostic(`rpc-fallback-${index + 1}`, error)
+    }
   }
-  return fallback
+  throw lastError
 }

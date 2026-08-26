@@ -1,0 +1,100 @@
+name: Release quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, test, build, audit, and smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Frontend tests
+        run: npm test
+
+      - name: Contract tests
+        run: npm run contracts:test
+
+      - name: Production build
+        run: npm run build
+        env:
+          VITE_SEPOLIA_RPC_URL: ${{ vars.VITE_SEPOLIA_RPC_URL }}
+          VITE_SEPOLIA_FHE_RPC_URL: ${{ vars.VITE_SEPOLIA_FHE_RPC_URL }}
+
+      - name: Production dependency audit
+        run: npm run audit:prod
+
+      - name: Confirm Chrome runtime
+        run: google-chrome --version
+
+      - name: Browser smoke
+        shell: bash
+        run: |
+          set -u
+          preview_log="$RUNNER_TEMP/browser-preview.log"
+          npm run preview >"$preview_log" 2>&1 &
+          preview_pid=$!
+
+          ready=0
+          for _ in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            cat "$preview_log"
+            kill "$preview_pid" 2>/dev/null || true
+            exit 1
+          fi
+
+          status=0
+          npm run browser:smoke || status=$?
+          kill "$preview_pid" 2>/dev/null || true
+          wait "$preview_pid" 2>/dev/null || true
+          if [ "$status" -ne 0 ]; then
+            cat "$preview_log"
+            exit "$status"
+          fi
+
+      - name: Upload browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-smoke-diagnostics
+          if-no-files-found: ignore
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/browser-preview.log
+            /tmp/confidential-pooltogether-*.png

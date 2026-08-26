@@ -9,7 +9,7 @@ async function main() {
   if (code === "0x") throw new Error(`No bytecode at ${deployment.pool}`)
 
   const pool = await hre.ethers.getContractAt("ConfidentialPrizePool", deployment.pool)
-  const [asset, owner, drawId, phase, drawClosesAt, drawPeriod, claimPeriod, protocolId] = await Promise.all([
+  const [asset, owner, drawId, phase, drawClosesAt, drawPeriod, claimPeriod, protocolId, participantCount, maxParticipants, rewardSource] = await Promise.all([
     pool.asset(),
     pool.owner(),
     pool.drawId(),
@@ -18,6 +18,9 @@ async function main() {
     pool.DRAW_PERIOD(),
     pool.CLAIM_PERIOD(),
     pool.confidentialProtocolId(),
+    pool.participantCount(),
+    pool.MAX_PARTICIPANTS(),
+    pool.rewardSource(),
   ])
 
   if (asset.toLowerCase() !== deployment.asset.toLowerCase()) throw new Error("Asset address mismatch")
@@ -25,6 +28,16 @@ async function main() {
   if (owner.toLowerCase() !== deployment.deployer.toLowerCase()) throw new Error("Owner address mismatch")
   if (pool.interface.hasFunction("snapshotTotal") || pool.interface.hasFunction("finalizeSnapshot")) {
     throw new Error("Deployment exposes the retired public aggregate flow")
+  }
+  if (deployment.privacyModel === "private-aggregate-v4-draw-scoped") {
+    if (!pool.interface.hasFunction("enterDraw") || !pool.interface.hasFunction("isEntered")) {
+      throw new Error("V4 deployment is missing draw-scoped enrollment")
+    }
+    if (maxParticipants !== 256n) throw new Error("Unexpected per-draw participant bound")
+    if (participantCount > maxParticipants) throw new Error("Participant count exceeds the per-draw bound")
+    if (!deployment.rewardSource || rewardSource.toLowerCase() !== deployment.rewardSource.toLowerCase()) {
+      throw new Error("Reward source mismatch")
+    }
   }
 
   const wrapper = new hre.ethers.Contract(asset, [
@@ -47,6 +60,10 @@ async function main() {
     drawClosesAt: drawClosesAt.toString(),
     drawPeriod: drawPeriod.toString(),
     claimPeriod: claimPeriod.toString(),
+    participantCount: participantCount.toString(),
+    maxParticipants: maxParticipants.toString(),
+    drawScopedEnrollment: deployment.privacyModel === "private-aggregate-v4-draw-scoped",
+    rewardSource,
     aggregateDisclosure: "none",
     encryptedRollover: true,
     confidentialProtocolId: protocolId.toString(),

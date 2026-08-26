@@ -20,6 +20,7 @@ async function main() {
   const vault = await hre.ethers.deployContract("ConfidentialLiquidityVault", [deployer.address, token.asset])
   await vault.waitForDeployment()
   const vaultAddress = await vault.getAddress()
+  const deploymentReceipt = await vault.deploymentTransaction()?.wait()
   const pool = await hre.ethers.getContractAt("ConfidentialPrizePool", poolDeployment.pool, deployer)
   const currentRewardSource = await pool.rewardSource()
   let rewardSourceTransactionHash = null
@@ -41,16 +42,26 @@ async function main() {
     prizePool: poolDeployment.pool,
     maturityPeriod: "90 days",
     rewardFundingCooldown: "1 day",
+    rewardAccrualPeriod: "365 days",
     targetApyBps: 1200,
-    programRewardBps: 295,
+    rewardAccrualModel: "encrypted-time-weighted-v2",
     apyAccounting: true,
     rewardSourceConfigured: true,
     transactionHash: vault.deploymentTransaction()?.hash || null,
+    deploymentBlock: deploymentReceipt?.blockNumber ?? null,
     rewardSourceTransactionHash,
     deployedAt: new Date().toISOString(),
   }
 
   const frontendGeneratedPath = path.join(process.cwd(), "..", "frontend", "src", "generated")
+  const updatedPoolDeployment = {
+    ...poolDeployment,
+    rewardSource: vaultAddress,
+    rewardSourceConfigured: true,
+    rewardSourceTransactionHash,
+  }
+  fs.writeFileSync(path.join(process.cwd(), "deployments", token.deploymentFile), `${JSON.stringify(updatedPoolDeployment, null, 2)}\n`)
+  fs.writeFileSync(path.join(frontendGeneratedPath, token.frontendDeploymentFile), `${JSON.stringify(updatedPoolDeployment, null, 2)}\n`)
   fs.writeFileSync(path.join(process.cwd(), "deployments", token.vaultDeploymentFile), `${JSON.stringify(deployment, null, 2)}\n`)
   fs.writeFileSync(path.join(frontendGeneratedPath, token.frontendVaultFile), `${JSON.stringify(deployment, null, 2)}\n`)
   console.log(JSON.stringify(deployment, null, 2))

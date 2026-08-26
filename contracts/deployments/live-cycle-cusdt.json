@@ -1,0 +1,86 @@
+{
+  "checkedAt": "2026-08-26T13:15:45.888Z",
+  "network": "sepolia",
+  "rpcPolicy": "public-only",
+  "market": "cUSDT",
+  "addresses": {
+    "pool": "0x9fCd8e05C9f08FDaB15871178B67055bEc3Cf00F",
+    "vault": "0x5a89824138F7A4da7d07C460e073E36d38745487",
+    "asset": "0x4E7B06D78965594eB5EF5414c357ca21E1554491"
+  },
+  "target": {
+    "drawId": 1,
+    "principal": "1000.0",
+    "directPrize": "29.5",
+    "deterministicSingleEntrant": false
+  },
+  "state": {
+    "currentDrawId": 1,
+    "phase": 0,
+    "participantCount": 0,
+    "drawClosesAt": "2026-09-02T11:54:24.000Z",
+    "claimClosesAt": null,
+    "hasDeposit": false,
+    "hasPrizeFunding": false,
+    "hasClaim": false,
+    "hasWithdrawal": false,
+    "hasNextDraw": false
+  },
+  "incompleteTasks": [
+    {
+      "id": "deposit",
+      "label": "Deposit encrypted test principal",
+      "ready": true,
+      "blockedBy": null
+    },
+    {
+      "id": "fund-prize",
+      "label": "Fund an encrypted direct testnet prize",
+      "ready": true,
+      "blockedBy": null
+    },
+    {
+      "id": "close-draw",
+      "label": "Close the funded draw",
+      "ready": false,
+      "blockedBy": "deposit and prize funding are required"
+    },
+    {
+      "id": "select-winner",
+      "label": "Complete bounded winner selection",
+      "ready": false,
+      "blockedBy": "draw must be selecting"
+    },
+    {
+      "id": "claim-prize",
+      "label": "Preview and claim the prize with the participant signer",
+      "ready": false,
+      "blockedBy": "draw must be inside its claim window"
+    },
+    {
+      "id": "withdraw-principal",
+      "label": "Withdraw the participant's test principal",
+      "ready": false,
+      "blockedBy": "successful claim submission is required first"
+    },
+    {
+      "id": "open-next-draw",
+      "label": "Open the next draw after the claim window",
+      "ready": false,
+      "blockedBy": "draw must be claimable"
+    }
+  ],
+  "submitted": [],
+  "eventTransactions": [
+    {
+      "event": "DrawOpened",
+      "hash": "0x5e5e21d2ef9b7fd0456ec44ed682e8879a0ad08be1bf544e66550d271e362587",
+      "blockNumber": 11570710,
+      "url": "https://sepolia.etherscan.io/tx/0x5e5e21d2ef9b7fd0456ec44ed682e8879a0ad08be1bf544e66550d271e362587"
+    }
+  ],
+  "remainingHumanEvidence": [
+    "Open the deployed UI with a real wallet and authorize the EIP-712 private session.",
+    "Decrypt the prize preview and post-claim confidential balance for judge-visible proof."
+  ]
+}

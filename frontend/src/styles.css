@@ -115,14 +115,11 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .read-error { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; margin-bottom: 18px; padding: 13px 16px; border: 1px solid var(--danger); border-radius: 4px; background: var(--danger-soft); color: var(--danger); font-size: 12px; }
 .read-error button { border: 0; border-bottom: 1px solid currentColor; background: transparent; color: inherit; font-weight: 720; }
 
-.draw-console { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: min(100%, 760px); gap: 8px; min-height: 0; overflow: visible; }
+.draw-console { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); width: 100%; gap: 8px; min-height: 0; margin-bottom: 22px; overflow: visible; }
 .draw-console > div { display: flex; align-items: center; min-width: 0; min-height: 86px; padding: 16px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); }
-.draw-console-id { gap: 12px; background: var(--ink); color: white; }
 .phase-light { width: 10px; height: 10px; flex: 0 0 auto; border-radius: 50%; background: var(--coral); box-shadow: 0 0 0 5px rgb(255 104 77 / 15%); }
 .phase-light.phase-2 { background: var(--lime); box-shadow: 0 0 0 5px rgb(223 255 99 / 14%); }
 .draw-console small { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; }
-.draw-console-id small { color: #aeb1a7; }
-.draw-console-id strong { display: block; margin-top: 4px; font-family: "Newsreader Variable", Georgia, serif; font-size: 25px; line-height: 1; }
 .draw-console-phase { display: block !important; }
 .draw-console-phase > span { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; text-transform: uppercase; }
 .draw-console-phase > strong { display: block; margin-top: 8px; font-size: 14px; }
@@ -132,6 +129,17 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .draw-console-metric { gap: 10px; }
 .draw-console-metric > svg { flex: 0 0 auto; color: #087064; }
 .draw-console-metric strong { display: block; margin-top: 4px; font-size: 13px; white-space: nowrap; }
+.draw-console-metric.draw-state { background: var(--ink); color: white; }
+.draw-console-metric.draw-state small { color: #aeb1a7; }
+.draw-console .lifecycle-control { grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; min-height: 100px; }
+.lifecycle-icon { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--line-strong); background: var(--surface-low); color: #087064; }
+.lifecycle-copy { min-width: 0; }
+.lifecycle-copy strong { display: block; margin-top: 4px; font-size: 14px; }
+.lifecycle-copy p { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.selection-progress { position: relative; height: 4px; margin-top: 22px; background: var(--surface-low); }
+.selection-progress i { position: absolute; inset: 0 auto 0 0; background: #087064; }
+.selection-progress span { position: absolute; bottom: 8px; left: 0; color: var(--muted); font-size: 10px; }
+.lifecycle-control .button { min-width: 154px; }
 .claim-status { justify-content: center; gap: 7px; font-size: 11px; font-weight: 760; text-transform: uppercase; }
 .claim-status.ready { background: var(--lime); color: var(--ink); }
 .claim-status.waiting { color: var(--muted); }
@@ -594,7 +602,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .overview-summary { max-width: 540px; }
   .vault-list-row { grid-template-columns: minmax(220px, 1.4fr) minmax(120px, .8fr) auto; }
   .vault-list-row .vault-list-detail:nth-child(3) { display: none; }
-  .draw-console { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .draw-console { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .draw-console > div { min-height: 82px; }
   .draw-console .snapshot { display: flex; }
   .workspace { grid-template-columns: 1fr; }
@@ -647,6 +655,8 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .draw-console { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .draw-console > div { min-height: 74px; padding: 14px; }
   .draw-console .snapshot { display: flex; }
+  .draw-console .lifecycle-control { grid-template-columns: auto minmax(0, 1fr); }
+  .lifecycle-control .button { grid-column: 1 / -1; width: 100%; }
   .vault-action { grid-template-columns: 1fr; width: 100%; }
   .token-action { grid-template-columns: 1fr; }
   .token-action { width: 100%; }

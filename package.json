@@ -28,7 +28,13 @@
     "contracts:verify-source:usdc": "TOKEN_SYMBOL=cUSDC npm run verify-source -w contracts",
     "contracts:fund:vault": "npm run fund:vault -w contracts",
     "contracts:fund:vault:usdc": "TOKEN_SYMBOL=cUSDC npm run fund:vault -w contracts",
+    "contracts:live:prepare": "npm run live:prepare -w contracts",
+    "contracts:live:prepare:usdc": "npm run live:prepare:usdc -w contracts",
+    "contracts:live:evidence": "npm run live:evidence -w contracts",
+    "contracts:live:evidence:usdc": "npm run live:evidence:usdc -w contracts",
+    "contracts:live:cycle": "npm run live:cycle -w contracts",
     "events:index": "npm run index -w backend",
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
     "lint": "eslint .",
     "test": "npm run test -w frontend"
   },
@@ -39,6 +45,15 @@
     "eslint-plugin-react-refresh": "^0.4.16",
     "globals": "^15.14.0",
     "typescript": "~5.7.2",
-    "typescript-eslint": "^8.18.2"
+    "typescript-eslint": "^8.18.2",
+    "vercel": "^59.3.0"
+  },
+  "overrides": {
+    "@coinbase/cdp-sdk": {
+      "axios": "1.20.0"
+    },
+    "@walletconnect/jsonrpc-ws-connection": {
+      "ws": "8.21.3"
+    }
   }
 }

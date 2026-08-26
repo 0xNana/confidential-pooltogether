@@ -6,15 +6,17 @@
   "underlyingSymbol": "USDC",
   "asset": "0x7c5BF43B851c1dff1a4feE8dB225b87f2C223639",
   "underlying": "0x9b5Cd13b8eFbB58Dc25A05CF411D8056058aDFfF",
-  "vault": "0xBbCDf44f8192cf253451368C679eAe1eFA58B33D",
-  "prizePool": "0x17f8C7703B0BCC665f97C870877f417AAfcc0E9E",
+  "vault": "0x4f7fB215FCB6926Cdae216F6E65Cc8ffF7faF185",
+  "prizePool": "0x0Df09628bAdA515D3b0A3AC8945120C14C725819",
   "maturityPeriod": "90 days",
   "rewardFundingCooldown": "1 day",
+  "rewardAccrualPeriod": "365 days",
   "targetApyBps": 1200,
-  "programRewardBps": 295,
+  "rewardAccrualModel": "encrypted-time-weighted-v2",
   "apyAccounting": true,
   "rewardSourceConfigured": true,
-  "transactionHash": "0x3fb87e3867e1beed2310d7600d52a824a65290cbe6a2e2891a7ac9edf5bfd19d",
-  "rewardSourceTransactionHash": "0x9fd90c00f427c10f5b3fcbc1bea45814c9aad6429ab27a63b8ebf3bc00a63788",
-  "deployedAt": "2026-08-20T22:26:01.553Z"
+  "transactionHash": "0xe046452a1802225c51839af77e989ad852760973e097749d40515f324e53539a",
+  "deploymentBlock": 11570845,
+  "rewardSourceTransactionHash": "0x06322e8af36d2422246a79b39edf05322274748c485f71f287752e619297a4be",
+  "deployedAt": "2026-08-26T12:23:38.893Z"
 }
