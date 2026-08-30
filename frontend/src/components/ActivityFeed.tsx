@@ -2,8 +2,9 @@ import { ArrowUpRight, Blocks, Radio } from "lucide-react"
 import type { ActivityItem } from "../hooks/useConfidentialPoolTogether"
 
 export function ActivityFeed({ activity, loading }: { activity: ActivityItem[]; loading: boolean }) {
+  const state = loading ? "loading" : activity.length === 0 ? "empty" : "ready"
   return (
-    <section className="activity-card ruled-panel" aria-labelledby="activity-title">
+    <section className="activity-card ruled-panel" aria-labelledby="activity-title" aria-live="polite" aria-busy={loading} data-testid="activity-feed" data-state={state}>
       <header className="compact-titlebar"><div><p className="eyebrow">Public metadata only</p><h2 id="activity-title">Encrypted activity</h2></div><span className="live-label"><Radio size={12} /> Live</span></header>
       {loading ? (
         <div className="activity-skeleton" aria-label="Loading activity"><i /><i /><i /></div>

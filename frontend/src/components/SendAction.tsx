@@ -41,11 +41,11 @@ export function SendAction({ account, activeMarket, correctChain }: SendActionPr
           <div className="token-action-gate"><Send size={18} /> Switch to Sepolia to send {activeMarket.tokenSymbol}.</div>
         ) : (
           <>
-            <label className="send-field"><span>Recipient</span><input value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="0x…" autoComplete="off" spellCheck="false" data-testid="send-recipient-input" /></label>
-            <label className="amount-entry token-amount-entry"><span>Amount</span><div><input value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" inputMode="decimal" autoComplete="off" data-testid="send-amount-input" /><strong>{activeMarket.tokenSymbol}</strong></div></label>
+            <label className="send-field"><span>Recipient</span><input name="recipient" value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="0x…" autoComplete="off" spellCheck="false" data-testid="send-recipient-input" /></label>
+            <label className="amount-entry token-amount-entry"><span>Amount</span><div><input name="send-amount" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" inputMode="decimal" autoComplete="off" data-testid="send-amount-input" /><strong>{activeMarket.tokenSymbol}</strong></div></label>
             {error && <p className="token-action-error" role="alert">{error}</p>}
             <button className="button button-orange action-primary" type="submit" disabled={transfer.isPending || !amount || !recipient} data-testid="send-submit">
-              {transfer.isPending ? "Sending" : `Send ${activeMarket.tokenSymbol}`} {transfer.isPending ? <span className="button-loader" /> : <ArrowRight size={17} />}
+              {transfer.isPending ? "Sending…" : `Send ${activeMarket.tokenSymbol}`} {transfer.isPending ? <span className="button-loader" /> : <ArrowRight size={17} />}
             </button>
           </>
         )}

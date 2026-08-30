@@ -17,6 +17,12 @@ const browser = await puppeteer.launch({
 
 const errors = []
 const networkDiagnostics = []
+const hasAccessibleNode = (node, role, name) => Boolean(
+  node && (
+    (node.role === role && node.name?.includes(name))
+    || node.children?.some((child) => hasAccessibleNode(child, role, name))
+  )
+)
 const watchErrors = (page) => {
   page.on("console", (message) => {
     if (message.type() !== "error") return
@@ -141,11 +147,21 @@ await page.goto(`${baseUrl}/`, { waitUntil: "networkidle2", timeout: 30_000 })
 await page.waitForSelector('[data-testid="launch-app"]')
 
 const landingText = await page.evaluate(() => document.body.textContent ?? "")
-if (!landingText.includes("Your savings enter the draw") || !landingText.includes("Principal stays yours")) {
+if (!landingText.includes("Prize savings with a private balance") || !landingText.includes("Private draw console") || !landingText.includes("Principal stays yours")) {
   throw new Error("Landing page product and deployment messaging is missing")
+}
+const landingAccessibility = await page.accessibility.snapshot()
+if (!hasAccessibleNode(landingAccessibility, "heading", "Confidential PoolTogether") || !hasAccessibleNode(landingAccessibility, "link", "Enter the private draw")) {
+  throw new Error("Landing page accessibility tree is missing its heading or primary action")
 }
 const landingOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 if (landingOverflow) throw new Error("Landing page has horizontal overflow at 1440px")
+for (const width of [1024, 768]) {
+  await page.setViewport({ width, height: 900, deviceScaleFactor: 1 })
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+  if (overflow) throw new Error(`Landing page has horizontal overflow at ${width}px`)
+}
+await page.setViewport({ width: 1440, height: 1100, deviceScaleFactor: 1 })
 
 const landingResources = await page.evaluate(() => performance.getEntriesByType("resource").map((entry) => entry.name))
 if (landingResources.some((url) => /tfhe_bg|kms_lib_bg|workerHelpers|VaultApp/.test(url))) {
@@ -157,6 +173,10 @@ await page.click('[data-testid="launch-app"]')
 await page.waitForFunction(() => window.location.pathname === "/app", { timeout: 10_000 })
 await page.waitForSelector('[data-testid="shell-overview"]')
 await page.waitForSelector('[data-testid="connect-wallet"]')
+const appAccessibility = await page.accessibility.snapshot()
+if (!hasAccessibleNode(appAccessibility, "button", "Overview") || !hasAccessibleNode(appAccessibility, "button", "Wallet required")) {
+  throw new Error("Vault accessibility tree is missing navigation or wallet controls")
+}
 await page.click('[data-testid="shell-deposit"]')
 await page.waitForSelector('[data-testid="live-draw"]')
 await waitForLiveState(page)
@@ -170,7 +190,10 @@ await waitForLiveState(page)
 const usdcText = await page.evaluate(() => document.body.textContent ?? "")
 if (!usdcText.includes("cUSDC")) throw new Error("cUSDC market did not become active")
 await page.click('[data-testid="shell-activity"]')
-await page.waitForSelector('[data-testid="activity-list"]', { timeout: 60_000 })
+await page.waitForFunction(() => {
+  const feed = document.querySelector('[data-testid="activity-feed"]')
+  return Boolean(feed && feed.getAttribute("data-state") !== "loading")
+}, { timeout: 60_000 })
 if (await page.$(".read-error")) throw new Error("Activity fallback degraded the cUSDC market read")
 await page.click('[data-testid="shell-overview"]')
 await page.waitForSelector('[data-testid="market-cusdt"]')
@@ -181,6 +204,12 @@ const appText = await page.evaluate(() => document.body.textContent ?? "")
 if (appText.includes("Demo wallet") || appText.includes("6,240.18")) throw new Error("Simulated wallet or prize data is still rendered")
 const appOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 if (appOverflow) throw new Error("Vault has horizontal overflow at 1440px")
+for (const width of [1024, 768]) {
+  await page.setViewport({ width, height: 900, deviceScaleFactor: 1 })
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+  if (overflow) throw new Error(`Vault has horizontal overflow at ${width}px`)
+}
+await page.setViewport({ width: 1440, height: 1100, deviceScaleFactor: 1 })
 
 const submitDisabled = await page.$eval('[data-testid="submit-action"]', (element) => element.hasAttribute("disabled"))
 if (!submitDisabled) throw new Error("Confidential action must be gated while disconnected")
@@ -230,7 +259,7 @@ await narrowPage.close()
 
 if (errors.length > 0) throw new Error(errors.join("\n"))
 
-console.log("Browser smoke passed: landing isolation, Launch App, cUSDT/cUSDC live state, FHE runtime initialization, private session authorization, proof drawer, wallet network gate, disconnected gating, and 320px/390px/1440px layouts")
+console.log("Browser smoke passed: landing isolation, accessibility trees, Launch App, cUSDT/cUSDC live state, FHE runtime initialization, private session authorization, proof drawer, wallet network gate, disconnected gating, and 320px/390px/768px/1024px/1440px layouts")
 } catch (error) {
   const diagnostics = [...errors, ...networkDiagnostics]
   if (diagnostics.length > 0) console.error(`Captured browser diagnostics before failure:\n${diagnostics.join("\n")}`)

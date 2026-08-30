@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Activity, ArrowDownToLine, ArrowLeft, ArrowUpRight, ExternalLink, FileCheck2, Github, LayoutDashboard, Send, Shield, ShieldOff, Zap } from "lucide-react"
 import { ActivityFeed } from "../components/ActivityFeed"
 import { BrandMark } from "../components/BrandMark"
@@ -18,6 +18,10 @@ export default function VaultApp() {
   const [proofOpen, setProofOpen] = useState(false)
   const [activeView, setActiveView] = useState<"overview" | "deposit" | "withdraw" | "shield" | "unshield" | "send" | "earn" | "activity">("overview")
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" })
+  }, [activeView])
+
   const viewCopy = {
     overview: { title: "Your vault" },
     deposit: { title: "Deposit" },
@@ -36,7 +40,7 @@ export default function VaultApp() {
       <header className="site-header vault-header">
         <a className="brand" href="/" aria-label="Confidential PoolTogether home">
           <BrandMark />
-          <span><strong>Confidential PoolTogether</strong><small>Confidential prize savings</small></span>
+          <span><strong>Confidential PoolTogether</strong><small>Built on Zama FHEVM</small></span>
         </a>
         <nav className="main-nav vault-nav" aria-label="Vault navigation">
           <a href="/"><ArrowLeft size={14} /> Protocol</a>

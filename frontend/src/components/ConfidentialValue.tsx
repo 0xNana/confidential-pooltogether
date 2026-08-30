@@ -39,7 +39,7 @@ export function ConfidentialValue({
         aria-label={revealed ? `${label} revealed` : `Reveal ${label}`}
       >
         {loading ? <LoaderCircle className="spin" size={15} /> : revealed ? <EyeOff size={15} /> : <Eye size={15} />}
-        <span>{loading ? "Decrypting" : revealed ? "Revealed" : "Reveal"}</span>
+        <span>{loading ? "Decrypting…" : revealed ? "Revealed" : "Reveal"}</span>
       </button>
     </div>
   )

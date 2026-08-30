@@ -33,7 +33,7 @@ export function DrawStatus(props: DrawStatusProps) {
       : !props.correctChain
         ? "Switch to Sepolia"
         : lifecycleBusy
-          ? props.operation.stage === "pending" ? "Confirming" : "Check wallet"
+          ? props.operation.stage === "pending" ? "Confirming…" : "Check wallet…"
           : lifecycle.label
   const action = !props.account ? props.connect : !props.correctChain ? props.switchNetwork : props.advanceDraw
   const selectionPercent = lifecycle.kind === "continue" && lifecycle.total

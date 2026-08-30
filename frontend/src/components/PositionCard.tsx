@@ -49,7 +49,7 @@ export function PositionCard(props: PositionCardProps) {
               <TicketCheck size={19} />
               <div><strong>Entry open for draw #{props.poolState.drawId}</strong><p>Your existing confidential principal stays in place.</p></div>
               <button className="button button-teal" type="button" onClick={() => void props.enterDraw()} disabled={entering} data-testid="enter-draw">
-                <TicketCheck size={15} /> {entering ? "Check wallet" : "Enter draw"}
+                <TicketCheck size={15} /> {entering ? "Check wallet…" : "Enter draw"}
               </button>
             </div>
           )}
@@ -59,7 +59,7 @@ export function PositionCard(props: PositionCardProps) {
               <KeyRound size={19} />
               <div><strong>Reveal your private position</strong><p>Sign once to let this device decrypt your balances and prize status. Nothing is posted onchain.</p></div>
               <button className="button button-ink" type="button" onClick={() => void props.authorizeReads()} disabled={authorizing} data-testid="authorize-session">
-                {authorizing ? "Check wallet" : "Reveal privately"}
+                {authorizing ? "Check wallet…" : "Reveal privately"}
               </button>
             </div>
           ) : props.principal === undefined || props.walletBalance === undefined ? (
@@ -67,7 +67,7 @@ export function PositionCard(props: PositionCardProps) {
               <ShieldCheck size={19} />
               <div><strong>Session authorized</strong><p>Request threshold decryption. Clear values return only to this browser session.</p></div>
               <button className="button button-teal" type="button" onClick={() => void props.revealPosition()} disabled={decrypting} data-testid="reveal-position">
-                <Eye size={15} /> {decrypting ? "Decrypting" : "Reveal values"}
+                <Eye size={15} /> {decrypting ? "Decrypting…" : "Reveal values"}
               </button>
             </div>
           ) : (

@@ -22,7 +22,7 @@ function AppLoading() {
   return (
     <main className="app-loading" aria-live="polite" aria-busy="true">
       <span className="app-loading-mark" aria-hidden="true" />
-      <p>Opening confidential vault</p>
+      <p>Opening confidential vault…</p>
     </main>
   )
 }

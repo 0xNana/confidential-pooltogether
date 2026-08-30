@@ -34,7 +34,7 @@ export function LandingPage() {
       <header className="landing-nav">
         <a className="brand" href="#top" aria-label="Confidential PoolTogether home">
           <BrandMark />
-          <span><strong>Confidential PoolTogether</strong><small>Private prize savings</small></span>
+          <span><strong><span className="landing-brand-long">Confidential PoolTogether</span><span className="landing-brand-short">PoolTogether</span></strong><small>Built on Zama FHEVM</small></span>
         </a>
         <nav aria-label="Landing navigation">
           <a href="#how-it-works">How it works</a>
@@ -45,16 +45,48 @@ export function LandingPage() {
 
       <main id="landing-content">
         <section className="landing-hero" id="top" aria-labelledby="landing-title">
-          <div className="landing-hero-copy">
-            <p className="eyebrow"><LockKeyhole size={14} /> Private prize savings · Live on Sepolia</p>
-            <h1 id="landing-title"><span>Confidential</span><em>PoolTogether</em></h1>
-            <p className="landing-hero-statement">Your savings enter the draw.<br />Your balance stays out of public view.</p>
-            <p className="landing-lede">Deposit cUSDT or cUSDC, stay liquid, and compete for yield while FHE keeps positions, odds, winners, and prizes encrypted.</p>
-            <div className="landing-actions">
-              <a className="button button-lime landing-primary-cta" href="/app" data-testid="launch-app">Start saving privately <ArrowRight size={17} /></a>
-              <a className="landing-text-link" href={`https://sepolia.etherscan.io/address/${POOL_ADDRESS}#code`} target="_blank" rel="noreferrer">Verify the live contract <ArrowUpRight size={15} /></a>
+          <div className="landing-hero-inner">
+            <div className="landing-hero-copy">
+              <p className="eyebrow"><LockKeyhole size={14} /> Zama FHEVM · Live on Sepolia</p>
+              <h1 id="landing-title"><span>Confidential</span><em>PoolTogether</em></h1>
+              <p className="landing-hero-statement">Prize savings with a private balance<br />and a publicly verifiable draw.</p>
+              <p className="landing-lede">Deposit confidential stablecoins, keep your principal available, and compete for yield while FHE keeps every position, odds, winner, and prize encrypted.</p>
+              <div className="landing-actions">
+                <a className="button button-lime landing-primary-cta" href="/app" data-testid="launch-app">Enter the private draw <ArrowRight size={17} /></a>
+                <a className="landing-text-link" href={`https://sepolia.etherscan.io/address/${POOL_ADDRESS}#code`} target="_blank" rel="noreferrer">Verify the live contract <ArrowUpRight size={15} /></a>
+              </div>
+              <p className="landing-hero-note"><ShieldCheck size={15} /><span><strong>No-loss prize design</strong>Your deposited principal is never awarded.</span></p>
             </div>
-            <p className="landing-hero-note"><ShieldCheck size={15} /><span><strong>No-loss prize design</strong>Your deposited principal is never awarded.</span></p>
+
+            <div className="hero-product" role="group" aria-label="How a confidential prize draw protects your position">
+              <div className="hero-product-orbit" aria-hidden="true" />
+              <header className="hero-product-header">
+                <span><BrandMark /><strong>Private draw console</strong></span>
+                <small><i /> Sepolia live</small>
+              </header>
+              <div className="hero-draw-status">
+                <span><small>Current draw</small><strong>#001 · Deposits open</strong></span>
+                <span><small>Prize pool</small><strong><LockKeyhole size={13} /> Encrypted</strong></span>
+              </div>
+              <div className="hero-private-position">
+                <div className="hero-private-heading">
+                  <span><small>Your position</small><strong>Visible only to you</strong></span>
+                  <span className="hero-encrypted-badge"><ShieldCheck size={13} /> FHE encrypted</span>
+                </div>
+                <div className="hero-cipher-value">
+                  <small>Vault balance</small>
+                  <span role="img" aria-label="Encrypted vault balance"><i /><i /><i /><i /><i /><i /></span>
+                  <p><EyeOff size={13} /> No plaintext amount is published</p>
+                </div>
+              </div>
+              <ol className="hero-privacy-path" aria-label="Confidential draw flow">
+                <li><span>01</span><strong>Save</strong><small>Encrypt</small></li>
+                <li><span>02</span><strong>Seal</strong><small>Snapshot</small></li>
+                <li><span>03</span><strong>Draw</strong><small>Compute</small></li>
+                <li><span>04</span><strong>Claim</strong><small>Decrypt</small></li>
+              </ol>
+              <div className="hero-product-foot"><ScanLine size={15} /><span><strong>Public execution. Private values.</strong><small>Powered by Zama FHEVM</small></span></div>
+            </div>
           </div>
           <div className="landing-hero-proof" aria-label="Protocol assurances">
             <span><WalletCards size={16} /><strong>Principal stays yours</strong><small>Withdraw while the pool is open</small></span>
@@ -124,7 +156,7 @@ export function LandingPage() {
       </main>
 
       <footer className="landing-footer">
-        <div className="brand"><BrandMark /><span><strong>Confidential PoolTogether</strong><small>Private prize savings</small></span></div>
+        <div className="brand"><BrandMark /><span><strong>Confidential PoolTogether</strong><small>Built on Zama FHEVM</small></span></div>
         <p>Built for Zama Developer Program Season 4.<br />Sepolia testnet software. Not yet audited.</p>
         <div>
           <a href={`https://sepolia.etherscan.io/address/${POOL_ADDRESS}`} target="_blank" rel="noreferrer"><ArrowUpRight size={14} /> Etherscan</a>

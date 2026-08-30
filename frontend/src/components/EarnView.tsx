@@ -79,12 +79,12 @@ export function EarnView(props: EarnViewProps) {
       <form className="earn-deposit" onSubmit={(event) => void submit(event)}>
         <div className="earn-deposit-heading"><div><p className="eyebrow">Liquidity Hunt vault</p><h3>Deposit {props.activeMarket.tokenSymbol}</h3><p>{hasRewardSource ? "Deposits define encrypted Earn TVL. The reward source funds prize liquidity from a separate reserve." : "This deployed vault should be treated as principal-only until reward-source verification passes."}</p></div><span className="earn-vault-status"><Check size={14} /> Vault live</span></div>
         {!props.account ? <div className="earn-deposit-gate"><Wallet size={17} /> Connect your wallet to deposit.</div> : !props.correctChain ? <div className="earn-deposit-gate"><Wallet size={17} /> Switch to Sepolia to deposit.</div> : <>
-          <label className="earn-amount"><span>Amount</span><div><input value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.0" inputMode="decimal" autoComplete="off" /><strong>{props.activeMarket.tokenSymbol}</strong></div></label>
+          <label className="earn-amount"><span>Amount</span><div><input name="earn-amount" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.0" inputMode="decimal" autoComplete="off" /><strong>{props.activeMarket.tokenSymbol}</strong></div></label>
           <div className="earn-deposit-toolbar"><button type="button" onClick={() => props.walletBalance !== undefined && setAmount(formatTokenAmount(props.walletBalance, 6))} disabled={props.walletBalance === undefined}>Max</button><span>Balance: {props.walletBalance === undefined ? "sealed" : `${formatTokenAmount(props.walletBalance)} ${props.activeMarket.tokenSymbol}`}</span></div>
           {error && <p className="earn-error" role="alert">{error}</p>}
           {status === "confirmed" && <p className="earn-success" role="status"><Check size={14} /> Deposit confirmed in the Liquidity Hunt vault.</p>}
           {hash && status === "pending" && <p className="earn-progress" role="status">Confirming your encrypted deposit…</p>}
-          <button className="button button-lime earn-deposit-submit" type="submit" disabled={busy || !amount}>{busy ? status === "approving" ? "Approve vault access" : status === "encrypting" ? "Encrypting deposit" : "Confirming deposit" : "Deposit in Earn"}<ArrowRight size={16} /></button>
+          <button className="button button-lime earn-deposit-submit" type="submit" disabled={busy || !amount}>{busy ? status === "approving" ? "Approve vault access…" : status === "encrypting" ? "Encrypting deposit…" : "Confirming deposit…" : "Deposit in Earn"}<ArrowRight size={16} /></button>
         </>}
       </form>
       <details className="earn-docs">
