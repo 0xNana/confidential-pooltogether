@@ -2,6 +2,7 @@ import deployment from "../generated/deployment.json"
 import deploymentUsdc from "../generated/deployment-usdc.json"
 import liquidityVault from "../generated/liquidity-vault.json"
 import liquidityVaultUsdc from "../generated/liquidity-vault-usdc.json"
+import { PUBLIC_SEPOLIA_RPC_URLS } from "../../sepolia-rpc-endpoints.mjs"
 
 export type Address = `0x${string}`
 export type MarketId = "cUSDT" | "cUSDC"
@@ -71,19 +72,11 @@ const configuredFallbackRpcUrls = import.meta.env.VITE_SEPOLIA_FALLBACK_RPC_URLS
   ?.split(",")
   .map((url: string) => url.trim())
   .filter(Boolean) ?? []
-const publicFallbackRpcUrls = [
-  "https://eth-sepolia.api.onfinality.io/public",
-  "https://api.zan.top/eth-sepolia",
-  "https://1rpc.io/sepolia",
-  "https://ethereum-sepolia-rpc.publicnode.com",
-  "https://sepolia.gateway.tenderly.co",
-]
-
 export const HAS_DEDICATED_SEPOLIA_RPC = Boolean(configuredRpcUrl)
 export const SEPOLIA_RPC_URLS = Array.from(new Set([
   ...(configuredRpcUrl ? [configuredRpcUrl] : []),
   ...configuredFallbackRpcUrls,
-  ...publicFallbackRpcUrls,
+  ...PUBLIC_SEPOLIA_RPC_URLS,
 ]))
 export const SEPOLIA_RPC_URL = SEPOLIA_RPC_URLS[0]
 export const SEPOLIA_FHE_RPC_URL = import.meta.env.VITE_SEPOLIA_FHE_RPC_URL?.trim() || "https://ethereum-sepolia-rpc.publicnode.com"

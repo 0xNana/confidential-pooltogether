@@ -2,6 +2,8 @@ import puppeteer from "puppeteer-core"
 import { Wallet } from "ethers"
 import { readdir } from "node:fs/promises"
 import { resolve } from "node:path"
+import { createRpcDiagnosticClassifier } from "./scripts-browser-diagnostics.mjs"
+import { PUBLIC_SEPOLIA_RPC_URLS } from "./sepolia-rpc-endpoints.mjs"
 
 const baseUrl = process.env.CONFIDENTIAL_POOLTOGETHER_BASE_URL ?? "http://127.0.0.1:4173"
 const assetsDirectory = resolve(process.cwd(), "dist/assets")
@@ -24,22 +26,32 @@ const hasAccessibleNode = (node, role, name) => Boolean(
   )
 )
 const watchErrors = (page) => {
+  const rpcDiagnostics = createRpcDiagnosticClassifier(PUBLIC_SEPOLIA_RPC_URLS)
+  page.on("request", (request) => {
+    rpcDiagnostics.observeRequest({ url: request.url(), postData: request.postData() })
+  })
   page.on("console", (message) => {
     if (message.type() !== "error") return
     const entry = `console: ${message.text()}`
-    if (/Failed to load resource|ERR_NETWORK_CHANGED/.test(message.text())) networkDiagnostics.push(entry)
+    if (
+      /Failed to load resource|ERR_NETWORK_CHANGED/.test(message.text())
+      || rpcDiagnostics.isRpcFailure({ message: message.text() })
+    ) networkDiagnostics.push(entry)
     else errors.push(entry)
   })
   page.on("pageerror", (error) => errors.push(`page: ${error.message}`))
   page.on("response", (response) => {
     if (response.status() < 400) return
     const entry = `network: ${response.status()} ${new URL(response.url()).origin}`
-    if (response.request().postData()?.includes('"jsonrpc"')) networkDiagnostics.push(entry)
+    if (rpcDiagnostics.isRpcFailure({
+      url: response.url(),
+      postData: response.request().postData(),
+    })) networkDiagnostics.push(entry)
     else errors.push(entry)
   })
   page.on("requestfailed", (request) => {
     const entry = `network: ${request.failure()?.errorText ?? "request failed"} ${new URL(request.url()).origin}`
-    if (request.postData()?.includes('"jsonrpc"')) networkDiagnostics.push(entry)
+    if (rpcDiagnostics.isRpcFailure({ url: request.url(), postData: request.postData() })) networkDiagnostics.push(entry)
     else errors.push(entry)
   })
 }
