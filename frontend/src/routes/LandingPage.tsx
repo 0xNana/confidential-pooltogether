@@ -40,7 +40,7 @@ export function LandingPage() {
           <a href="#how-it-works">How it works</a>
           <a href="#privacy">Privacy model</a>
         </nav>
-        <a className="button button-lime landing-launch" href="/app">Open vault <ArrowUpRight size={15} /></a>
+        <a className="button button-accent landing-launch" href="/app">Open vault <ArrowUpRight size={15} /></a>
       </header>
 
       <main id="landing-content">
@@ -52,7 +52,7 @@ export function LandingPage() {
               <p className="landing-hero-statement">Prize savings with a private balance<br />and a publicly verifiable draw.</p>
               <p className="landing-lede">Deposit confidential stablecoins, keep your principal available, and compete for yield while FHE keeps every position, odds, winner, and prize encrypted.</p>
               <div className="landing-actions">
-                <a className="button button-lime landing-primary-cta" href="/app" data-testid="launch-app">Enter the private draw <ArrowRight size={17} /></a>
+                <a className="button button-accent landing-primary-cta" href="/app" data-testid="launch-app">Enter the private draw <ArrowRight size={17} /></a>
                 <a className="landing-text-link" href={`https://sepolia.etherscan.io/address/${POOL_ADDRESS}#code`} target="_blank" rel="noreferrer">Verify the live contract <ArrowUpRight size={15} /></a>
               </div>
               <p className="landing-hero-note"><ShieldCheck size={15} /><span><strong>No-loss prize design</strong>Your deposited principal is never awarded.</span></p>
@@ -151,7 +151,7 @@ export function LandingPage() {
           <p className="eyebrow">The live confidential vault</p>
           <h2 id="final-cta-title">Your balance is<br />nobody else&apos;s business.</h2>
           <p>Connect on Sepolia, fund confidential stablecoins, and enter the encrypted draw.</p>
-          <a className="button button-lime landing-primary-cta" href="/app">Open Confidential PoolTogether <ArrowRight size={17} /></a>
+          <a className="button button-accent landing-primary-cta" href="/app">Open Confidential PoolTogether <ArrowRight size={17} /></a>
         </section>
       </main>
 

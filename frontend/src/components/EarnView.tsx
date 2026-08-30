@@ -84,7 +84,7 @@ export function EarnView(props: EarnViewProps) {
           {error && <p className="earn-error" role="alert">{error}</p>}
           {status === "confirmed" && <p className="earn-success" role="status"><Check size={14} /> Deposit confirmed in the Liquidity Hunt vault.</p>}
           {hash && status === "pending" && <p className="earn-progress" role="status">Confirming your encrypted deposit…</p>}
-          <button className="button button-lime earn-deposit-submit" type="submit" disabled={busy || !amount}>{busy ? status === "approving" ? "Approve vault access…" : status === "encrypting" ? "Encrypting deposit…" : "Confirming deposit…" : "Deposit in Earn"}<ArrowRight size={16} /></button>
+          <button className="button button-accent earn-deposit-submit" type="submit" disabled={busy || !amount}>{busy ? status === "approving" ? "Approve vault access…" : status === "encrypting" ? "Encrypting deposit…" : "Confirming deposit…" : "Deposit in Earn"}<ArrowRight size={16} /></button>
         </>}
       </form>
       <details className="earn-docs">

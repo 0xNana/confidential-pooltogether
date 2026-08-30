@@ -66,10 +66,10 @@ export function TokenAction({ account, activeMarket, correctChain, mode, walletB
           <div className="token-action-gate"><Shield size={18} /> Switch to Sepolia to use the official wrapper.</div>
         ) : (
           <>
-            {!isShield && available === undefined && !permitReady && <div className="token-action-gate"><KeyRound size={18} /><span>Authorize a private session to access your {activeMarket.tokenSymbol} balance.</span><button className="button button-lime" type="button" onClick={() => void authorizeReads()} disabled={authorizing}>{authorizing ? "Check wallet…" : "Authorize reads"}</button></div>}
-            {!isShield && available === undefined && permitReady && <div className="token-action-gate token-action-reveal"><ShieldCheck size={18} /><button className="button button-lime" type="button" onClick={() => void revealPosition()} disabled={decrypting}><Eye size={15} /> {decrypting ? "Decrypting…" : "Reveal balance"}</button></div>}
+            {!isShield && available === undefined && !permitReady && <div className="token-action-gate"><KeyRound size={18} /><span>Authorize a private session to access your {activeMarket.tokenSymbol} balance.</span><button className="button button-accent" type="button" onClick={() => void authorizeReads()} disabled={authorizing}>{authorizing ? "Check wallet…" : "Authorize reads"}</button></div>}
+            {!isShield && available === undefined && permitReady && <div className="token-action-gate token-action-reveal"><ShieldCheck size={18} /><button className="button button-accent" type="button" onClick={() => void revealPosition()} disabled={decrypting}><Eye size={15} /> {decrypting ? "Decrypting…" : "Reveal balance"}</button></div>}
             {error && <p className="token-action-error" role="alert">{error}</p>}
-            <button className="button button-orange action-primary" type="submit" disabled={busy || !amount || (!isShield && available === undefined)} data-testid={`${mode}-submit`}>
+            <button className="button button-accent action-primary" type="submit" disabled={busy || !amount || (!isShield && available === undefined)} data-testid={`${mode}-submit`}>
               {busy ? (isShield ? "Shielding" : "Unshielding") : (isShield ? `Shield ${activeMarket.tokenSymbol}` : `Unshield ${activeMarket.tokenSymbol}`)}
               {busy ? <span className="button-loader" /> : <ArrowRight size={17} />}
             </button>

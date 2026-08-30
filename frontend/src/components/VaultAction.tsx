@@ -70,7 +70,7 @@ export function VaultAction({ mode, ...props }: VaultActionProps & { mode: Mode 
           </ol>
         )}
 
-        <button className="button button-orange action-primary" type="submit" disabled={Boolean(disabledReason) || actionBusy} data-testid="submit-action">
+        <button className="button button-accent action-primary" type="submit" disabled={Boolean(disabledReason) || actionBusy} data-testid="submit-action">
           {actionBusy && props.operation.kind === mode ? props.operation.title : disabledReason ?? (mode === "deposit" ? "Deposit" : "Withdraw")}
           {actionBusy ? <span className="button-loader" /> : <ArrowRight size={17} />}
         </button>

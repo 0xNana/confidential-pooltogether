@@ -28,13 +28,13 @@ export function PositionCard(props: PositionCardProps) {
         <div className="position-gate">
           <span className="gate-icon"><Wallet size={23} /></span>
           <div><h3>Connect to access your sealed account.</h3><p>Public pool data remains visible. Your balances require your wallet and a signed Zama decryption permit.</p></div>
-          <button className="button button-orange" type="button" onClick={() => void props.connect()}><Wallet size={16} /> Connect</button>
+          <button className="button button-accent" type="button" onClick={() => void props.connect()}><Wallet size={16} /> Connect</button>
         </div>
       ) : !props.correctChain ? (
         <div className="position-gate">
           <span className="gate-icon"><Fingerprint size={23} /></span>
           <div><h3>Sepolia is required.</h3><p>The deployed pool and its FHEVM ACL live on Ethereum Sepolia.</p></div>
-          <button className="button button-orange" type="button" onClick={() => void props.switchNetwork()}>Switch network</button>
+          <button className="button button-accent" type="button" onClick={() => void props.switchNetwork()}>Switch network</button>
         </div>
       ) : (
         <>
@@ -48,7 +48,7 @@ export function PositionCard(props: PositionCardProps) {
             <div className="permit-callout authorized">
               <TicketCheck size={19} />
               <div><strong>Entry open for draw #{props.poolState.drawId}</strong><p>Your existing confidential principal stays in place.</p></div>
-              <button className="button button-teal" type="button" onClick={() => void props.enterDraw()} disabled={entering} data-testid="enter-draw">
+              <button className="button button-accent" type="button" onClick={() => void props.enterDraw()} disabled={entering} data-testid="enter-draw">
                 <TicketCheck size={15} /> {entering ? "Check wallet…" : "Enter draw"}
               </button>
             </div>
@@ -66,7 +66,7 @@ export function PositionCard(props: PositionCardProps) {
             <div className="permit-callout authorized">
               <ShieldCheck size={19} />
               <div><strong>Session authorized</strong><p>Request threshold decryption. Clear values return only to this browser session.</p></div>
-              <button className="button button-teal" type="button" onClick={() => void props.revealPosition()} disabled={decrypting} data-testid="reveal-position">
+              <button className="button button-accent" type="button" onClick={() => void props.revealPosition()} disabled={decrypting} data-testid="reveal-position">
                 <Eye size={15} /> {decrypting ? "Decrypting…" : "Reveal values"}
               </button>
             </div>
