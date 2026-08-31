@@ -8,6 +8,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 interface IConfidentialPrizeReceiver {
+    function preparePrizeCapacity() external returns (euint64);
+
     function receivePrizeFromSource(euint64 encryptedAmount) external;
 }
 
@@ -107,9 +109,10 @@ contract ConfidentialLiquidityVault is ZamaEthereumConfig, Ownable, ReentrancyGu
         if (lastRewardFundedAt != 0 && block.timestamp < readyAt) revert RewardFundingCooldown(readyAt);
 
         _accrueRewards();
-        euint128 payout128 = FHE.min(_accruedReward, FHE.asEuint128(_rewardReserve));
-        euint64 payout = FHE.asEuint64(payout128);
-        _accruedReward = FHE.sub(_accruedReward, payout128);
+        euint128 availableReward = FHE.min(_accruedReward, FHE.asEuint128(_rewardReserve));
+        euint64 capacity = IConfidentialPrizeReceiver(prizePool).preparePrizeCapacity();
+        euint64 payout = FHE.min(FHE.asEuint64(availableReward), capacity);
+        _accruedReward = FHE.sub(_accruedReward, FHE.asEuint128(payout));
         _rewardReserve = FHE.sub(_rewardReserve, payout);
         lastRewardFundedAt = uint64(block.timestamp);
 

@@ -16,12 +16,9 @@ async function main() {
   if (!poolReceipt || !vaultReceipt) throw new Error("Deployment receipt is unavailable")
 
   const latestBlock = await hre.ethers.provider.getBlockNumber()
-  const [drawId, phase, drawClosesAt, participantCount, scanCursor, rewardSource, poolEvents, vaultEvents] = await Promise.all([
-    pool.drawId(),
-    pool.phase(),
-    pool.drawClosesAt(),
-    pool.participantCount(),
-    pool.scanCursor(),
+  const [currentDrawId, currentMetadata, rewardSource, poolEvents, vaultEvents] = await Promise.all([
+    pool.currentDrawId(),
+    pool.currentDrawMetadata(),
     pool.rewardSource(),
     readContractEvents(pool, poolReceipt.blockNumber, latestBlock),
     readContractEvents(vault, vaultReceipt.blockNumber, latestBlock),
@@ -30,10 +27,11 @@ async function main() {
   const poolDeposits = eventsNamed(poolEvents, "DepositRecorded")
   const poolWithdrawals = eventsNamed(poolEvents, "WithdrawalRecorded")
   const prizeFunding = eventsNamed(poolEvents, "PrizeFunded")
-  const selectionStarts = eventsNamed(poolEvents, "DrawSelectionStarted")
-  const selectionProgress = eventsNamed(poolEvents, "DrawSelectionProgress")
+  const selectionStarts = eventsNamed(poolEvents, "DrawFinalized")
+  const selectionProgress = eventsNamed(poolEvents, "SelectionProgress")
   const claimableEvents = eventsNamed(poolEvents, "DrawClaimable")
   const claimAttempts = eventsNamed(poolEvents, "PrizeClaimAttempted")
+  const prizeSweeps = eventsNamed(poolEvents, "PrizeSwept")
   const nextDraws = eventsNamed(poolEvents, "DrawOpened")
   const vaultDeposits = eventsNamed(vaultEvents, "Deposited")
   const rewardsFunded = eventsNamed(vaultEvents, "RewardsFunded")
@@ -51,11 +49,12 @@ async function main() {
       underlying: token.underlying,
     },
     draw: {
-      drawId: drawId.toString(),
-      phase: Number(phase),
-      drawClosesAt: new Date(Number(drawClosesAt) * 1000).toISOString(),
-      participantCount: participantCount.toString(),
-      scanCursor: scanCursor.toString(),
+      currentDrawId: currentDrawId.toString(),
+      status: Number(currentMetadata.status),
+      scheduledOpen: new Date(Number(currentMetadata.scheduledOpen) * 1000).toISOString(),
+      scheduledClose: new Date(Number(currentMetadata.scheduledClose) * 1000).toISOString(),
+      participantCount: currentMetadata.participantCount.toString(),
+      scanCursor: currentMetadata.scanCursor.toString(),
     },
     checks: {
       hasPoolPrincipal: poolDeposits.length > 0,
@@ -67,6 +66,7 @@ async function main() {
       hasClaimAttempt: claimAttempts.length > 0,
       hasPrincipalWithdrawal: poolWithdrawals.length > 0,
       hasNextDraw: nextDraws.length > 1,
+      hasHistoricalOverlap: selectionStarts.some((event) => Number(event.args.drawId) < Number(currentDrawId)),
     },
     transactions: {
       poolDeposits: links(poolDeposits),
@@ -79,6 +79,7 @@ async function main() {
       selectionProgress: links(selectionProgress),
       claimable: links(claimableEvents),
       claims: links(claimAttempts),
+      prizeSweeps: links(prizeSweeps),
       withdrawals: links(poolWithdrawals),
       drawsOpened: links(nextDraws),
     },

@@ -12,6 +12,7 @@
     "deploy:vault:usdc": "TOKEN_SYMBOL=cUSDC hardhat run scripts/deploy-vault.cjs --network sepolia",
     "fund:vault": "hardhat run scripts/fund-vault.cjs --network sepolia",
     "fund:vault:usdc": "TOKEN_SYMBOL=cUSDC hardhat run scripts/fund-vault.cjs --network sepolia",
+    "deposit:test-accounts:usdc": "hardhat run scripts/deposit-test-accounts-usdc.cjs --network sepolia",
     "live:prepare": "hardhat run scripts/prepare-live-demo.cjs --network sepolia",
     "live:prepare:usdc": "TOKEN_SYMBOL=cUSDC hardhat run scripts/prepare-live-demo.cjs --network sepolia",
     "live:evidence": "hardhat run scripts/live-evidence.cjs --network sepolia",

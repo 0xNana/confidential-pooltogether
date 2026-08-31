@@ -45,6 +45,7 @@ async function main() {
     rewardAccrualPeriod: "365 days",
     targetApyBps: 1200,
     rewardAccrualModel: "encrypted-time-weighted-v2",
+    prizeCapacityModel: "encrypted-pool-capacity-handshake-v1",
     apyAccounting: true,
     rewardSourceConfigured: true,
     transactionHash: vault.deploymentTransaction()?.hash || null,

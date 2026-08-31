@@ -7,8 +7,8 @@ const connected: VaultWorkflowState = {
   permitReady: true,
   isOperator: true,
   principal: 0n,
-  phase: 0,
-  deadlineReached: false,
+  currentDrawExpired: false,
+  hasSelectingDraw: false,
   claimable: false,
 }
 
@@ -21,11 +21,10 @@ describe("deriveVaultWorkflowStep", () => {
     expect(deriveVaultWorkflowStep({ ...connected, isOperator: false })).toBe("approve-operator")
     expect(deriveVaultWorkflowStep(connected)).toBe("deposit")
     expect(deriveVaultWorkflowStep({ ...connected, principal: 100n })).toBe("wait-for-close")
-    expect(deriveVaultWorkflowStep({ ...connected, principal: 100n, deadlineReached: true })).toBe("close-draw")
-    expect(deriveVaultWorkflowStep({ ...connected, principal: 100n, phase: 1 })).toBe("continue-selection")
-    expect(deriveVaultWorkflowStep({ ...connected, principal: 100n, phase: 2, claimable: true })).toBe("preview-prize")
-    expect(deriveVaultWorkflowStep({ ...connected, principal: 100n, phase: 2, claimable: true, prize: 50n })).toBe("claim-prize")
-    expect(deriveVaultWorkflowStep({ ...connected, principal: 100n, phase: 2, claimable: true, prize: 0n })).toBe("withdraw")
-    expect(deriveVaultWorkflowStep({ ...connected, phase: 2, claimable: false })).toBe("open-next-draw")
+    expect(deriveVaultWorkflowStep({ ...connected, principal: 100n, hasSelectingDraw: true })).toBe("continue-selection")
+    expect(deriveVaultWorkflowStep({ ...connected, principal: 100n, claimable: true })).toBe("preview-prize")
+    expect(deriveVaultWorkflowStep({ ...connected, principal: 100n, claimable: true, prize: 50n })).toBe("claim-prize")
+    expect(deriveVaultWorkflowStep({ ...connected, principal: 100n, claimable: true, prize: 0n })).toBe("withdraw")
+    expect(deriveVaultWorkflowStep({ ...connected, currentDrawExpired: true })).toBe("close-draw")
   })
 })

@@ -28,6 +28,7 @@
     "contracts:verify-source:usdc": "TOKEN_SYMBOL=cUSDC npm run verify-source -w contracts",
     "contracts:fund:vault": "npm run fund:vault -w contracts",
     "contracts:fund:vault:usdc": "TOKEN_SYMBOL=cUSDC npm run fund:vault -w contracts",
+    "contracts:deposit:test-accounts:usdc": "npm run deposit:test-accounts:usdc -w contracts",
     "contracts:live:prepare": "npm run live:prepare -w contracts",
     "contracts:live:prepare:usdc": "npm run live:prepare:usdc -w contracts",
     "contracts:live:evidence": "npm run live:evidence -w contracts",

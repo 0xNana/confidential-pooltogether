@@ -20,7 +20,7 @@ Public observers can still see:
 - wallet addresses interacting with contracts,
 - transaction timing,
 - gas usage,
-- draw phase,
+- draw-scoped status and aligned schedule,
 - deadlines,
 - participant count,
 - selection cursor,
@@ -43,7 +43,7 @@ Public observers can still see:
 - Sepolia deployments are testnet-only.
 - The reward vault simulates APY from a funded reserve; it is not realized external strategy yield.
 - Participant addresses and timing are public.
-- The current participant cap is 256 lifetime addresses.
+- The participant cap is 256 addresses per draw.
 - Contract upgrades are not supported; fixes require redeployment and manifest updates.
 
 ## Operational Controls
@@ -51,8 +51,9 @@ Public observers can still see:
 Draw progression is permissionless:
 
 - `closeDraw()`
-- `continueSelection()`
-- `openNextDraw()`
+- `continueSelection(drawId, maxAccounts)`
+- `expireDraw(drawId)`
+- `sweepExpiredPrize(drawId)`
 
 Reward configuration remains controlled:
 
@@ -65,9 +66,11 @@ Reward configuration remains controlled:
 Before production custody:
 
 1. Replace reward reserve simulation with an audited yield adapter.
-2. Add invariant and fuzz tests for conservation, participant limits, claims, and phase transitions.
+2. Extend invariant and fuzz tests for conservation, participant limits, claims, and draw-scoped status transitions.
 3. Run static analysis.
 4. Complete external audit.
 5. Add keeper incentives for lifecycle calls.
 6. Document exact FHEVM randomness assumptions for the deployed network version.
 7. Add monitoring for draw deadlines, stalled selection, reward funding, and indexer lag.
+
+Arithmetic controls reserve half of the `euint64` custody range for aggregate principal and half for aggregate prizes. Inbound amounts are confidentially clamped before ERC-7984 transfer, including a capacity handshake with the reward vault. Selection widens both `totalWeight * randEuint64()` and `cumulativeWeight << 64` to `euint128` before comparison.

@@ -1,57 +1,46 @@
 function incompleteTasks(state) {
-  if (state.hasNextDraw || state.currentDrawId > state.targetDrawId) return []
+  if (state.hasClaim && state.hasWithdrawal && state.currentDrawId > state.targetDrawId) return []
 
   const tasks = []
+  const targetIsCurrent = state.currentDrawId === state.targetDrawId
   if (!state.hasDeposit) {
-    tasks.push(task("deposit", "Deposit encrypted test principal", state.phase === 0, "draw must be open"))
+    tasks.push(task("deposit", "Deposit encrypted test principal", targetIsCurrent && state.targetStatus === 0, "target entry draw must be open"))
   }
   if (!state.hasPrizeFunding) {
-    const claimWindowOpen = state.phase === 2 && !state.hasClaim && state.now < state.claimClosesAt
-    tasks.push(task(
-      "fund-prize",
-      "Fund an encrypted direct testnet prize",
-      state.phase <= 1 || claimWindowOpen,
-      "target claim window must still be open and unclaimed",
-    ))
+    tasks.push(task("fund-prize", "Fund an encrypted direct testnet prize", targetIsCurrent && state.targetStatus === 0, "target prize can only be funded while it is the open entry draw"))
   }
 
-  if (state.phase === 0) {
+  if (state.targetStatus === 0) {
     const prerequisitesReady = state.hasDeposit && state.hasPrizeFunding
     tasks.push(task(
       "close-draw",
-      "Close the funded draw",
-      prerequisitesReady && state.now >= state.drawClosesAt,
-      !prerequisitesReady ? "deposit and prize funding are required" : `wait until ${iso(state.drawClosesAt)}`,
+      "Finalize the funded entry draw",
+      targetIsCurrent && prerequisitesReady && state.now >= state.scheduledClose,
+      !prerequisitesReady ? "deposit and prize funding are required" : `wait until ${iso(state.scheduledClose)}`,
     ))
   }
-
-  if (state.phase <= 1) {
-    tasks.push(task("select-winner", "Complete bounded winner selection", state.phase === 1, "draw must be selecting"))
+  if (state.targetStatus === 1) {
+    tasks.push(task("select-winner", "Complete bounded historical winner selection", true, null))
   }
-
   if (!state.hasClaim) {
     tasks.push(task(
       "claim-prize",
-      "Preview and claim the prize with the participant signer",
-      state.phase === 2 && state.now < state.claimClosesAt,
-      "draw must be inside its claim window",
+      "Preview and claim the historical prize",
+      state.targetStatus === 2 && state.now < state.claimExpiresAt,
+      "target draw must be inside its claim window",
     ))
   }
   if (!state.hasWithdrawal) {
     tasks.push(task(
       "withdraw-principal",
       "Withdraw the participant's test principal",
-      state.phase === 2 && state.hasClaim,
+      state.hasClaim,
       "successful claim submission is required first",
     ))
   }
-
-  tasks.push(task(
-    "open-next-draw",
-    "Open the next draw after the claim window",
-    state.phase === 2 && state.hasClaim && state.hasWithdrawal && state.now >= state.claimClosesAt,
-    state.phase !== 2 ? "draw must be claimable" : `wait until ${iso(state.claimClosesAt)}`,
-  ))
+  if (state.targetStatus === 3) {
+    tasks.push(task("sweep-prize", "Sweep the encrypted historical remainder", true, null))
+  }
   return tasks
 }
 
@@ -60,18 +49,20 @@ function nextExecutableTask(tasks) {
 }
 
 function unrecoverableReason(state) {
-  if (state.phase === 2 && !state.hasClaim && state.claimClosesAt > 0 && state.now >= state.claimClosesAt) {
-    return `claim window expired at ${iso(state.claimClosesAt)} before the target claim was submitted`
+  if ((state.targetStatus === 3 || state.targetStatus === 4) && !state.hasClaim) {
+    return `claim window expired at ${iso(state.claimExpiresAt)} before the target claim was submitted`
+  }
+  if (!state.hasPrizeFunding && state.targetStatus !== 0) {
+    return "target draw finalized before its prize was funded"
   }
   return null
 }
 
 function nonzeroClaimRisk(state) {
-  if (state.currentDrawId !== state.targetDrawId) return null
   if (!state.hasDeposit && state.participantCount > 0) {
     return "the target participant has no recorded deposit; refusing a draw that cannot guarantee a nonzero claim"
   }
-  if (!state.hasDeposit && state.phase > 0) {
+  if (!state.hasDeposit && state.targetStatus > 0) {
     return "the target draw progressed without a recorded participant deposit"
   }
   if (state.hasDeposit && state.participantCount !== 1) {

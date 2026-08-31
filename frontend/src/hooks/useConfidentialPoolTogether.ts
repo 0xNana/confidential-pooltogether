@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import { useDecryptValues, useEncrypt, useGrantPermit, useHasPermit, useClearCredentials } from "@zama-fhe/react-sdk"
 import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi"
 import {
@@ -16,7 +16,7 @@ import {
   ASSET_ABI,
   CHAIN_ID,
   DEFAULT_MARKET,
-  DRAW_PHASES,
+  DRAW_STATUSES,
   MARKETS,
   POOL_ABI,
   LIQUIDITY_VAULT_ABI,
@@ -37,15 +37,26 @@ import { deriveDrawLifecycle } from "../lib/draw-lifecycle"
 import { isTransientProviderError, reportDiagnostic, retryTransient, toUserError } from "../lib/user-errors"
 import { deriveVaultWorkflowStep } from "../lib/vault-workflow"
 
-export type PoolState = {
+export type DrawState = {
   drawId: number
-  phase: number
-  phaseLabel: string
-  drawClosesAt: number
-  claimClosesAt: number
+  status: number
+  statusLabel: string
+  scheduledOpen: number
+  scheduledClose: number
+  claimableAt: number
+  claimExpiresAt: number
   participantCount: number
   scanCursor: number
   claimable: boolean
+  isEntered?: boolean
+}
+
+export type PoolState = {
+  currentDraw: DrawState
+  historicalDraws: DrawState[]
+  claimDraw?: DrawState
+  actionableDrawCount: number
+  historicalOffset: number
   deploymentBlock?: number
 }
 
@@ -73,15 +84,24 @@ const readProviders = SEPOLIA_RPC_URLS.map((url) => {
 let preferredReadProvider = 0
 const poolInterface = new Interface(POOL_ABI)
 const cachedDeploymentBlocks: Partial<Record<MarketId, number>> = {}
-const initialPoolState: PoolState = {
+const HISTORICAL_PAGE_SIZE = 32
+const initialDrawState: DrawState = {
   drawId: 0,
-  phase: 0,
-  phaseLabel: DRAW_PHASES[0],
-  drawClosesAt: 0,
-  claimClosesAt: 0,
+  status: 0,
+  statusLabel: DRAW_STATUSES[0],
+  scheduledOpen: 0,
+  scheduledClose: 0,
+  claimableAt: 0,
+  claimExpiresAt: 0,
   participantCount: 0,
   scanCursor: 0,
   claimable: false,
+}
+const initialPoolState: PoolState = {
+  currentDraw: initialDrawState,
+  historicalDraws: [],
+  actionableDrawCount: 0,
+  historicalOffset: 0,
 }
 
 export function useConfidentialPoolTogether() {
@@ -109,6 +129,7 @@ export function useConfidentialPoolTogether() {
   const [vaultTvlHandle, setVaultTvlHandle] = useState<string>()
   const [vaultTvl, setVaultTvl] = useState<bigint>()
   const [prize, setPrize] = useState<bigint>()
+  const [prizeDrawId, setPrizeDrawId] = useState<number>()
   const [isOperator, setIsOperator] = useState(false)
   const [isEntered, setIsEntered] = useState<boolean>()
   const [decryptInputs, setDecryptInputs] = useState<Array<{ encryptedValue: `0x${string}`; contractAddress: Address }>>([])
@@ -116,6 +137,8 @@ export function useConfidentialPoolTogether() {
   const [loading, setLoading] = useState(true)
   const [readError, setReadError] = useState<string>()
   const [operation, setOperation] = useState<OperationState>({ stage: "idle" })
+  const [historicalOffset, setHistoricalOffset] = useState(0)
+  const claimDrawIdRef = useRef<number | undefined>(undefined)
 
   const correctChain = walletChainId === CHAIN_ID
   const walletAvailable = typeof window !== "undefined" && Boolean(window.ethereum)
@@ -130,9 +153,9 @@ export function useConfidentialPoolTogether() {
     isOperator,
     principal,
     prize,
-    phase: poolState.phase,
-    deadlineReached: poolState.drawClosesAt > 0 && Math.floor(Date.now() / 1000) >= poolState.drawClosesAt,
-    claimable: poolState.claimable,
+    currentDrawExpired: poolState.currentDraw.scheduledClose > 0 && Math.floor(Date.now() / 1000) >= poolState.currentDraw.scheduledClose,
+    hasSelectingDraw: poolState.historicalDraws.some((draw) => draw.status === 1),
+    claimable: Boolean(poolState.claimDraw?.claimable),
   })
 
   const selectMarket = useCallback((marketId: MarketId) => {
@@ -144,11 +167,13 @@ export function useConfidentialPoolTogether() {
     setUnderlyingBalance(undefined)
     setVaultTvl(undefined)
     setPrize(undefined)
+    setPrizeDrawId(undefined)
     setPrizeHandle(undefined)
     setDecryptInputs([])
     setDecryptTarget(undefined)
     setIsOperator(false)
     setIsEntered(undefined)
+    setHistoricalOffset(0)
   }, [])
 
   const refreshActivity = useCallback(async () => {
@@ -195,24 +220,43 @@ export function useConfidentialPoolTogether() {
   const refresh = useCallback(async (includeActivity = false) => {
     setReadError(undefined)
     try {
+      if (!activeMarket.drawScopedEnrollment) {
+        throw new Error("This generated deployment manifest uses the superseded draw ABI. Deploy and bind the continuous-draw contracts before using this market.")
+      }
       const snapshot = await retryTransient(() => withReadProvider(async (readProvider) => {
         const pool = new Contract(activeMarket.poolAddress, POOL_ABI, readProvider)
         const asset = new Contract(activeMarket.assetAddress, ASSET_ABI, readProvider)
         const underlying = new Contract(activeMarket.underlyingAddress, UNDERLYING_ABI, readProvider)
         const liquidityVault = new Contract(activeMarket.liquidityVaultAddress, LIQUIDITY_VAULT_ABI, readProvider)
-        const [drawIdRaw, phaseRaw, drawClosesAtRaw, participantCountRaw, scanCursorRaw] = await Promise.all([
-          pool.drawId(),
-          pool.phase(),
-          pool.drawClosesAt(),
-          pool.participantCount(),
-          pool.scanCursor(),
+        const [currentDrawIdRaw, actionableCountRaw] = await Promise.all([
+          pool.currentDrawId(),
+          pool.actionableDrawCount(),
         ])
-        const drawId = Number(drawIdRaw)
-        const phase = Number(phaseRaw)
-        const [claimableRaw, claimClosesAtRaw] = await Promise.all([
-          pool.drawClaimable(drawId),
-          pool.drawClaimClosesAt(drawId),
+        const currentDrawId = Number(currentDrawIdRaw)
+        const actionableDrawCount = Number(actionableCountRaw)
+        const pageOffset = historicalOffset < actionableDrawCount ? historicalOffset : 0
+        const historicalIds = Array.from(await pool.actionableDrawIds(pageOffset, HISTORICAL_PAGE_SIZE), (id: bigint) => Number(id))
+        const [currentMetadata, ...historicalMetadata] = await Promise.all([
+          pool.drawMetadata(currentDrawId),
+          ...historicalIds.map((id) => pool.drawMetadata(id)),
         ])
+        const now = Math.floor(Date.now() / 1000)
+        const currentDraw = toDrawState(currentDrawId, currentMetadata, now)
+        const historicalDraws = historicalMetadata
+          .map((metadata, index) => toDrawState(historicalIds[index], metadata, now))
+          .filter((draw) => draw.scheduledOpen > 0)
+
+        if (account) {
+          const entered = await Promise.all([
+            pool.isEntered(currentDrawId, account),
+            ...historicalDraws.map((draw) => pool.isEntered(draw.drawId, account)),
+          ])
+          currentDraw.isEntered = Boolean(entered[0])
+          historicalDraws.forEach((draw, index) => { draw.isEntered = Boolean(entered[index + 1]) })
+        }
+        const claimDraw = [...historicalDraws]
+          .filter((draw) => draw.claimable && (!account || draw.isEntered))
+          .sort((a, b) => b.drawId - a.drawId)[0]
         const privateState = account
           ? await Promise.all([
               pool.principalOf(account),
@@ -220,42 +264,41 @@ export function useConfidentialPoolTogether() {
               underlying.balanceOf(account),
               asset.isOperator(account, activeMarket.poolAddress),
               liquidityVault.totalPrincipal(),
-              activeMarket.drawScopedEnrollment ? pool.isEntered(account) : undefined,
             ])
           : undefined
         return {
-          drawId,
-          phase,
-          drawClosesAt: Number(drawClosesAtRaw),
-          participantCount: Number(participantCountRaw),
-          scanCursor: Number(scanCursorRaw),
-          claimClosesAt: Number(claimClosesAtRaw),
-          claimableRaw: Boolean(claimableRaw),
+          currentDraw,
+          historicalDraws,
+          claimDraw,
+          actionableDrawCount,
+          historicalOffset: pageOffset,
           privateState,
         }
       }), { attempts: 2 })
 
-      const claimable = snapshot.claimableRaw && snapshot.claimClosesAt > Math.floor(Date.now() / 1000)
+      if (claimDrawIdRef.current !== snapshot.claimDraw?.drawId) {
+        claimDrawIdRef.current = snapshot.claimDraw?.drawId
+        setPrize(undefined)
+        setPrizeDrawId(undefined)
+        setPrizeHandle(undefined)
+      }
       setPoolState({
-        drawId: snapshot.drawId,
-        phase: snapshot.phase,
-        phaseLabel: DRAW_PHASES[snapshot.phase] ?? "Unknown",
-        drawClosesAt: snapshot.drawClosesAt,
-        claimClosesAt: snapshot.claimClosesAt,
-        participantCount: snapshot.participantCount,
-        scanCursor: snapshot.scanCursor,
-        claimable,
+        currentDraw: snapshot.currentDraw,
+        historicalDraws: snapshot.historicalDraws,
+        claimDraw: snapshot.claimDraw,
+        actionableDrawCount: snapshot.actionableDrawCount,
+        historicalOffset: snapshot.historicalOffset,
         deploymentBlock: cachedDeploymentBlocks[activeMarket.id],
       })
 
       if (snapshot.privateState) {
-        const [nextPrincipalHandle, nextWalletHandle, nextUnderlyingBalance, operator, nextVaultTvlHandle, entered] = snapshot.privateState
+        const [nextPrincipalHandle, nextWalletHandle, nextUnderlyingBalance, operator, nextVaultTvlHandle] = snapshot.privateState
         setVaultTvlHandle(String(nextVaultTvlHandle))
         setPrincipalHandle(String(nextPrincipalHandle))
         setWalletHandle(String(nextWalletHandle))
         setUnderlyingBalance(BigInt(nextUnderlyingBalance))
         setIsOperator(Boolean(operator))
-        setIsEntered(entered === undefined ? undefined : Boolean(entered))
+        setIsEntered(activeMarket.drawScopedEnrollment ? snapshot.currentDraw.isEntered : undefined)
       } else {
         setPrincipalHandle(undefined)
         setWalletHandle(undefined)
@@ -272,7 +315,7 @@ export function useConfidentialPoolTogether() {
     } finally {
       setLoading(false)
     }
-  }, [account, activeMarket, refreshActivity])
+  }, [account, activeMarket, historicalOffset, refreshActivity])
 
   useEffect(() => {
     void refresh(true)
@@ -300,6 +343,7 @@ export function useConfidentialPoolTogether() {
     setUnderlyingBalance(undefined)
     setVaultTvl(undefined)
     setPrize(undefined)
+    setPrizeDrawId(undefined)
     setPrizeHandle(undefined)
     setDecryptInputs([])
     setDecryptTarget(undefined)
@@ -408,9 +452,9 @@ export function useConfidentialPoolTogether() {
   }, [activeMarket, browserProvider, correctChain, refresh])
 
   const enterDraw = useCallback(async () => {
-    if (!account || !browserProvider || !correctChain || !activeMarket.drawScopedEnrollment || poolState.phase !== 0 || isEntered) return
+    if (!account || !browserProvider || !correctChain || !activeMarket.drawScopedEnrollment || poolState.currentDraw.status !== 0 || isEntered) return
     try {
-      setOperation({ kind: "entry", stage: "signature", title: `Enter draw #${poolState.drawId}` })
+      setOperation({ kind: "entry", stage: "signature", title: `Enter draw #${poolState.currentDraw.drawId}` })
       const signer = await browserProvider.getSigner()
       const pool = new Contract(activeMarket.poolAddress, POOL_ABI, signer)
       const tx = await pool.enterDraw()
@@ -418,12 +462,12 @@ export function useConfidentialPoolTogether() {
       const receipt = await waitForSuccess(tx.wait())
       recordActivityFromReceipt(receipt, setActivity)
       setIsEntered(true)
-      setOperation({ kind: "entry", stage: "confirmed", title: `Entered draw #${poolState.drawId}`, hash: tx.hash })
+      setOperation({ kind: "entry", stage: "confirmed", title: `Entered draw #${poolState.currentDraw.drawId}`, hash: tx.hash })
       await refresh(true)
     } catch (error) {
       setOperation({ kind: "entry", stage: "error", error: toUserError(error, "Could not enter this draw.") })
     }
-  }, [account, activeMarket, browserProvider, correctChain, isEntered, poolState.drawId, poolState.phase, refresh])
+  }, [account, activeMarket, browserProvider, correctChain, isEntered, poolState.currentDraw.drawId, poolState.currentDraw.status, refresh])
 
   const transact = useCallback(async (kind: "deposit" | "withdraw", amountInput: string) => {
     if (!account || !browserProvider || !correctChain) return
@@ -459,16 +503,21 @@ export function useConfidentialPoolTogether() {
     }
   }, [account, activeMarket, browserProvider, correctChain, isOperator, principal, refresh, walletBalance, zamaEncrypt])
 
-  const previewPrize = useCallback(async () => {
-    if (!account || !browserProvider || !correctChain || !poolState.claimable) return
+  const previewPrize = useCallback(async (requestedDrawId?: number) => {
+    const targetDraw = requestedDrawId === undefined
+      ? poolState.claimDraw
+      : poolState.historicalDraws.find((draw) => draw.drawId === requestedDrawId)
+    if (!account || !browserProvider || !correctChain || !targetDraw?.claimable || !targetDraw.isEntered) return
     try {
-      setOperation({ kind: "preview", stage: "signature", title: "Create encrypted prize preview" })
+      setPrize(undefined)
+      setPrizeDrawId(targetDraw.drawId)
+      setOperation({ kind: "preview", stage: "signature", title: `Create draw #${targetDraw.drawId} prize preview` })
       const signer = await browserProvider.getSigner()
       const pool = new Contract(activeMarket.poolAddress, POOL_ABI, signer)
-      const tx = await pool.previewPrize(poolState.drawId)
+      const tx = await pool.previewPrize(targetDraw.drawId)
       setOperation({ kind: "preview", stage: "pending", title: "Computing prize-or-zero", hash: tx.hash })
       await waitForSuccess(tx.wait())
-      const handle = String(await pool.prizePreviewOf(poolState.drawId, account))
+      const handle = String(await pool.prizePreviewOf(targetDraw.drawId, account))
       if (!permitReady) {
         setOperation({ kind: "preview", stage: "confirmed", title: "Preview ready — authorize a private session to reveal", hash: tx.hash })
         return
@@ -480,15 +529,16 @@ export function useConfidentialPoolTogether() {
     } catch (error) {
       setOperation({ kind: "preview", stage: "error", error: toUserError(error, "Prize preview failed.") })
     }
-  }, [account, activeMarket.poolAddress, browserProvider, correctChain, permitReady, poolState.claimable, poolState.drawId])
+  }, [account, activeMarket.poolAddress, browserProvider, correctChain, permitReady, poolState.claimDraw, poolState.historicalDraws])
 
-  const claimPrize = useCallback(async () => {
-    if (!browserProvider || !correctChain || prize === undefined || prize === 0n) return
+  const claimPrize = useCallback(async (requestedDrawId?: number) => {
+    const targetDrawId = requestedDrawId ?? poolState.claimDraw?.drawId
+    if (!browserProvider || !correctChain || targetDrawId === undefined || prizeDrawId !== targetDrawId || prize === undefined || prize === 0n) return
     try {
       setOperation({ kind: "claim", stage: "signature", title: "Confirm private prize claim" })
       const signer = await browserProvider.getSigner()
       const pool = new Contract(activeMarket.poolAddress, POOL_ABI, signer)
-      const tx = await pool.claimPrize(poolState.drawId)
+      const tx = await pool.claimPrize(targetDrawId)
       setOperation({ kind: "claim", stage: "pending", title: "Prize claim pending", hash: tx.hash })
       const receipt = await waitForSuccess(tx.wait())
       recordActivityFromReceipt(receipt, setActivity)
@@ -499,11 +549,50 @@ export function useConfidentialPoolTogether() {
     } catch (error) {
       setOperation({ kind: "claim", stage: "error", error: toUserError(error, "Prize claim failed.") })
     }
-  }, [activeMarket.poolAddress, browserProvider, correctChain, poolState.drawId, prize, refresh])
+  }, [activeMarket.poolAddress, browserProvider, correctChain, poolState.claimDraw?.drawId, prize, prizeDrawId, refresh])
+
+  const advanceSelection = useCallback(async (drawId: number) => {
+    if (!browserProvider || !correctChain) return
+    const draw = poolState.historicalDraws.find((candidate) => candidate.drawId === drawId)
+    if (!draw || draw.status !== 1) return
+    try {
+      const remaining = Math.max(0, draw.participantCount - draw.scanCursor)
+      const batchSize = Math.min(12, remaining)
+      if (batchSize === 0) return
+      setOperation({ kind: "lifecycle", stage: "signature", title: `Advance draw #${drawId} selection` })
+      const signer = await browserProvider.getSigner()
+      const pool = new Contract(activeMarket.poolAddress, POOL_ABI, signer)
+      const tx = await pool.continueSelection(drawId, batchSize)
+      setOperation({ kind: "lifecycle", stage: "pending", title: "Historical selection pending", hash: tx.hash })
+      const receipt = await waitForSuccess(tx.wait())
+      recordActivityFromReceipt(receipt, setActivity)
+      setOperation({ kind: "lifecycle", stage: "confirmed", title: `Draw #${drawId} selection advanced`, hash: tx.hash })
+      await refresh(true)
+    } catch (error) {
+      setOperation({ kind: "lifecycle", stage: "error", error: toUserError(error, "Could not advance historical selection.") })
+    }
+  }, [activeMarket.poolAddress, browserProvider, correctChain, poolState.historicalDraws, refresh])
+
+  const sweepPrize = useCallback(async (drawId: number) => {
+    if (!browserProvider || !correctChain) return
+    try {
+      setOperation({ kind: "lifecycle", stage: "signature", title: `Sweep draw #${drawId}` })
+      const signer = await browserProvider.getSigner()
+      const pool = new Contract(activeMarket.poolAddress, POOL_ABI, signer)
+      const tx = await pool.sweepExpiredPrize(drawId)
+      setOperation({ kind: "lifecycle", stage: "pending", title: "Encrypted prize sweep pending", hash: tx.hash })
+      const receipt = await waitForSuccess(tx.wait())
+      recordActivityFromReceipt(receipt, setActivity)
+      setOperation({ kind: "lifecycle", stage: "confirmed", title: `Draw #${drawId} swept`, hash: tx.hash })
+      await refresh(true)
+    } catch (error) {
+      setOperation({ kind: "lifecycle", stage: "error", error: toUserError(error, "Could not sweep the expired prize.") })
+    }
+  }, [activeMarket.poolAddress, browserProvider, correctChain, refresh])
 
   const advanceDraw = useCallback(async () => {
     if (!browserProvider || !correctChain) return
-    const lifecycle = deriveDrawLifecycle(poolState, Math.floor(Date.now() / 1000))
+    const lifecycle = deriveDrawLifecycle(poolState.currentDraw, poolState.historicalDraws, Math.floor(Date.now() / 1000))
     if (!lifecycle.ready) {
       setOperation({ kind: "lifecycle", stage: "error", error: lifecycle.reason })
       return
@@ -514,15 +603,15 @@ export function useConfidentialPoolTogether() {
         ? "Confirm draw close"
         : lifecycle.kind === "continue"
           ? `Advance ${lifecycle.batchSize} selection accounts`
-          : "Confirm next draw"
+          : lifecycle.kind === "sweep" ? `Sweep draw #${lifecycle.drawId}` : "No draw action"
       setOperation({ kind: "lifecycle", stage: "signature", title })
       const signer = await browserProvider.getSigner()
       const pool = new Contract(activeMarket.poolAddress, POOL_ABI, signer)
       const tx = lifecycle.kind === "close"
         ? await pool.closeDraw()
         : lifecycle.kind === "continue"
-          ? await pool.continueSelection(lifecycle.batchSize)
-          : await pool.openNextDraw()
+          ? await pool.continueSelection(lifecycle.drawId, lifecycle.batchSize)
+          : await pool.sweepExpiredPrize(lifecycle.drawId)
       setOperation({ kind: "lifecycle", stage: "pending", title: "Draw lifecycle transaction pending", hash: tx.hash })
       const receipt = await waitForSuccess(tx.wait())
       recordActivityFromReceipt(receipt, setActivity)
@@ -530,7 +619,7 @@ export function useConfidentialPoolTogether() {
         ? "Winner selection started"
         : lifecycle.kind === "continue"
           ? "Winner selection advanced"
-          : "Next draw opened"
+          : "Expired prize swept"
       setOperation({ kind: "lifecycle", stage: "confirmed", title: confirmedTitle, hash: tx.hash })
       await refresh(true)
     } catch (error) {
@@ -580,6 +669,7 @@ export function useConfidentialPoolTogether() {
     setWalletBalance(undefined)
     setUnderlyingBalance(undefined)
     setPrize(undefined)
+    setPrizeDrawId(undefined)
     setIsEntered(undefined)
     setOperation({ stage: "idle" })
   }, [clearCredentials, disconnectAsync])
@@ -601,6 +691,7 @@ export function useConfidentialPoolTogether() {
     vaultTvl,
     browserProvider,
     prize,
+    prizeDrawId,
     isOperator,
     isEntered,
     permitReady,
@@ -620,19 +711,49 @@ export function useConfidentialPoolTogether() {
     transact,
     previewPrize,
     claimPrize,
+    advanceSelection,
+    sweepPrize,
+    setHistoricalOffset,
     advanceDraw,
     fundTestnet,
     refresh,
     clearOperation,
   }), [
     account, activeMarket, walletAvailable, walletChainId, correctChain, poolState, activity, principal, walletBalance, underlyingBalance, vaultTvl, browserProvider,
-    prize, isOperator, isEntered, permitReady, relayerStatus, loading, readError, operation, workflowStep, connect, disconnect,
-    switchNetwork, authorizeReads, revealPosition, approveOperator, enterDraw, selectMarket, transact, previewPrize, claimPrize, advanceDraw, fundTestnet, refresh,
+    prize, prizeDrawId, isOperator, isEntered, permitReady, relayerStatus, loading, readError, operation, workflowStep, connect, disconnect,
+    switchNetwork, authorizeReads, revealPosition, approveOperator, enterDraw, selectMarket, transact, previewPrize, claimPrize, advanceSelection, sweepPrize, setHistoricalOffset, advanceDraw, fundTestnet, refresh,
     clearOperation,
   ])
 }
 
 export type ConfidentialPoolTogetherModel = ReturnType<typeof useConfidentialPoolTogether>
+
+type DrawMetadataResult = {
+  scheduledOpen: bigint
+  scheduledClose: bigint
+  claimableAt: bigint
+  claimExpiresAt: bigint
+  participantCount: bigint
+  scanCursor: bigint
+  status: bigint
+}
+
+function toDrawState(drawId: number, metadata: DrawMetadataResult, now: number): DrawState {
+  const status = Number(metadata.status)
+  const claimExpiresAt = Number(metadata.claimExpiresAt)
+  return {
+    drawId,
+    status,
+    statusLabel: DRAW_STATUSES[status] ?? "Unknown",
+    scheduledOpen: Number(metadata.scheduledOpen),
+    scheduledClose: Number(metadata.scheduledClose),
+    claimableAt: Number(metadata.claimableAt),
+    claimExpiresAt,
+    participantCount: Number(metadata.participantCount),
+    scanCursor: Number(metadata.scanCursor),
+    claimable: status === 2 && claimExpiresAt > now,
+  }
+}
 
 function parseActivity(logs: Log[]): ActivityItem[] {
   const labels: Record<string, string> = {
@@ -641,17 +762,18 @@ function parseActivity(logs: Log[]): ActivityItem[] {
     WithdrawalRecorded: "Principal withdrawal recorded",
     PrizeFunded: "Yield entered the prize reserve",
     DrawOpened: "New private draw opened",
-    DrawSelectionStarted: "Verifiable selection started",
-    DrawSelectionProgress: "Encrypted winner scan advanced",
+    DrawFinalized: "Entry period finalized",
+    SelectionProgress: "Encrypted winner scan advanced",
     DrawClaimable: "Private prize claims enabled",
-    PrizeRolledOver: "Encrypted prize reserve rolled forward",
+    DrawExpired: "Private claim window expired",
+    PrizeSwept: "Encrypted prize reserve swept forward",
     PrizeClaimAttempted: "Prize-or-zero claim submitted",
   }
   return logs.flatMap((log) => {
     try {
       const parsed = poolInterface.parseLog(log)
       if (!parsed || !labels[parsed.name]) return []
-      const rawDrawId = parsed.args.drawId ?? parsed.args.toDrawId
+      const rawDrawId = parsed.args.drawId ?? parsed.args.sourceDrawId ?? parsed.args.targetDrawId
       const drawId = rawDrawId === undefined ? undefined : Number(rawDrawId)
       return [{
         id: `${log.transactionHash}-${log.index}`,

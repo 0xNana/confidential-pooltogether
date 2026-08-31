@@ -2,7 +2,7 @@
 
 Confidential PoolTogether is a no-loss prize savings prototype built with Zama FHEVM. Users deposit confidential stablecoins, keep access to their principal, and enter weighted prize draws without publishing deposit amounts, balances, odds, winner identity, or prize amounts.
 
-The current Sepolia deployment supports two markets:
+The repository is configured for two markets:
 
 - `cUSDT`
 - `cUSDC`
@@ -16,7 +16,8 @@ This project was built for the Zama Developer Program Mainnet Season 4. It is V5
 - Zama browser relayer integration for encrypted inputs, proofs, permits, and user decryption.
 - ERC-7984 cUSDT and cUSDC support using Zama's official Sepolia mock wrappers.
 - Encrypted deposits, withdrawals, balances, prize previews, and prize claims.
-- Permissionless draw lifecycle methods for closing draws, continuing selection, and opening the next draw.
+- Fixed, epoch-aligned 24-hour entry draws with overlapping historical selection and claims.
+- Permissionless draw lifecycle methods for finalizing, continuing draw-scoped selection, expiring, and sweeping prizes.
 - Encrypted weighted winner selection with bounded scan batches.
 - Confidential Liquidity Hunt vaults that track encrypted Earn TVL and simulate time-weighted reward accrual from a separately funded reserve.
 - Supabase event indexing for public lifecycle events, with a bounded RPC fallback when the index is unavailable.
@@ -35,18 +36,20 @@ flowchart LR
 
   deposit --> pool["Confidential prize pool"]
   pool --> privateState["Encrypted balances, odds, winner, and prize"]
-  pool --> publicState["Public draw phase, deadline, participant count, and cursor"]
+  pool --> publicState["Public draw-scoped status, fixed schedule, participant count, and cursor"]
 
   saver --> earn["Optional Liquidity Hunt Earn vault"]
   earn --> reserve["Encrypted reward reserve"]
   reserve --> pool
 
   keeper["Any account"] --> close["closeDraw"]
-  close --> select["continueSelection"]
+  close --> nextEntry["Next aligned draw opens immediately"]
+  close --> select["continueSelection(drawId, batch)"]
   select --> claimable["Claim window"]
   claimable --> preview["User previews prize-or-zero"]
   preview --> claim["Claim encrypted prize-or-zero"]
-  claimable --> next["openNextDraw"]
+  claimable --> sweep["sweepExpiredPrize(drawId)"]
+  sweep --> nextEntry
 
   pool --> indexer["Public event indexer"]
   indexer --> ui["Frontend activity feed"]
@@ -157,7 +160,7 @@ npm run contracts:live:cycle
 LIVE_CYCLE_EXECUTE=1 npm run contracts:live:cycle
 ```
 
-The first command is chain-read-only and does not require a private key. The execute form requires the current pool owner's `DEPLOYER_PRIVATE_KEY`; it seeds missing principal and direct testnet prize liquidity, advances eligible draw phases, submits preview and claim transactions, withdraws principal, opens the next draw when its deadline permits, and records Etherscan links under `contracts/deployments/live-cycle-*.json`.
+The first command is chain-read-only and does not require a private key. The execute form requires the current pool owner's `DEPLOYER_PRIVATE_KEY`; it seeds missing principal and direct testnet prize liquidity, finalizes the fixed entry period, advances selection by explicit historical draw ID, submits preview and claim transactions while a newer draw is open, withdraws principal, and records Etherscan links under `contracts/deployments/live-cycle-*.json`.
 
 GitHub Actions runs lint, frontend tests, contract tests, the production build, the production dependency gate, and the Chrome browser smoke on pull requests and pushes to `main`. Configure `VITE_SEPOLIA_RPC_URL` and `VITE_SEPOLIA_FHE_RPC_URL` repository variables for dedicated CI reads; these browser endpoints are compiled into the public frontend and must not contain privileged credentials. Without them, the application uses its bounded public fallbacks.
 
@@ -206,15 +209,15 @@ Deployment manifests are written to `contracts/deployments/` and copied into `fr
 
 | Market | Pool | Reward vault | Draw 1 close |
 | --- | --- | --- | --- |
-| cUSDT | `0x9fCd8e05C9f08FDaB15871178B67055bEc3Cf00F` | `0x5a89824138F7A4da7d07C460e073E36d38745487` | `2026-09-02 11:54:24 UTC` |
-| cUSDC | `0x0Df09628bAdA515D3b0A3AC8945120C14C725819` | `0x4f7fB215FCB6926Cdae216F6E65Cc8ffF7faF185` | `2026-09-02 11:55:00 UTC` |
+| cUSDT | `0x7f05Ed06B957906f16013de908E825bd836e28d3` | `0xfC6DbFA68f86144e20846401febd52A87d39e13E` | `2026-09-01 14:13:12 UTC` |
+| cUSDC | `0x66fCF1bB6C790176c770FaC028994fD375bF27ad` | `0x09e250E6105EB21053D32dbB705d836bAd8EC041` | `2026-09-01 14:13:48 UTC` |
 
 Verified source:
 
-- cUSDT pool: https://sepolia.etherscan.io/address/0x9fCd8e05C9f08FDaB15871178B67055bEc3Cf00F#code
-- cUSDT reward vault: https://sepolia.etherscan.io/address/0x5a89824138F7A4da7d07C460e073E36d38745487#code
-- cUSDC pool: https://sepolia.etherscan.io/address/0x0Df09628bAdA515D3b0A3AC8945120C14C725819#code
-- cUSDC reward vault: https://sepolia.etherscan.io/address/0x4f7fB215FCB6926Cdae216F6E65Cc8ffF7faF185#code
+- cUSDT pool: https://sepolia.etherscan.io/address/0x7f05Ed06B957906f16013de908E825bd836e28d3#code
+- cUSDT reward vault: https://sepolia.etherscan.io/address/0xfC6DbFA68f86144e20846401febd52A87d39e13E#code
+- cUSDC pool: https://sepolia.etherscan.io/address/0x66fCF1bB6C790176c770FaC028994fD375bF27ad#code
+- cUSDC reward vault: https://sepolia.etherscan.io/address/0x09e250E6105EB21053D32dbB705d836bAd8EC041#code
 
 Official Zama Sepolia wrappers:
 
@@ -230,11 +233,11 @@ Official Zama Sepolia wrappers:
 | Deposit and withdrawal amounts | Encrypted input bound to the target contract |
 | User principal | Encrypted handle, decryptable by the user |
 | Confidential token balance | Encrypted handle, decryptable by the user |
-| Snapshot weight and odds | Encrypted, contract-only |
+| Incrementally maintained draw weight and odds | Encrypted, contract-only |
 | Winner address | Encrypted, contract-only |
 | Prize amount | Encrypted prize-or-zero result, decryptable by the caller |
 | Aggregate pool size | Encrypted, contract-only |
-| Draw phase, deadlines, participant count, and selection cursor | Public |
+| Per-draw status, fixed schedules, participant count, and selection cursor | Public |
 
 Participant addresses and transaction timing remain visible at the Ethereum account layer. This prototype does not claim account-level participation privacy.
 
@@ -242,11 +245,11 @@ Participant addresses and transaction timing remain visible at the Ethereum acco
 
 1. A user grants the pool a time-bounded ERC-7984 operator approval.
 2. The user deposits encrypted cUSDT or cUSDC into the selected prize pool.
-3. Anyone can call `closeDraw()` after the draw deadline.
-4. Anyone can call `continueSelection()` to progress encrypted weighted winner selection in bounded batches.
+3. At the fixed daily cutoff, anyone can call `closeDraw()`; the next aligned entry draw opens immediately.
+4. Anyone can call `continueSelection(drawId, maxAccounts)` to progress an older draw in bounded batches while the current draw accepts entries.
 5. During the claim window, participants call `previewPrize(drawId)` to create a decryptable prize-or-zero result.
 6. Participants call `claimPrize(drawId)` to receive the encrypted prize-or-zero transfer.
-7. Anyone can call `openNextDraw()` after the claim window closes.
+7. Anyone can call `sweepExpiredPrize(drawId)` after expiry; the encrypted remainder moves into the draw open at execution time.
 
 ## Supabase Event Index
 
@@ -268,4 +271,6 @@ This code is unaudited and should not custody production funds.
 
 The Liquidity Hunt reward vault is a testnet APY simulator. It checkpoints encrypted TVL when principal changes or prizes are funded, accrues a 12% annual target in proportion to elapsed time, and carries unpaid accrual when the reserve is exhausted. Rewards come only from a separately funded encrypted reserve, not from realized external strategy yield. The one-day funding cooldown limits transaction frequency; it does not create a new reward slice. Before mainnet use, replace the reserve simulator with an audited yield adapter, add broader invariant and fuzz testing, decentralize keeper operations, and complete an external audit.
 
-The current winner-selection implementation is intentionally bounded for testnet demonstration and supports at most 256 active entrants per draw. Enrollment is draw-scoped, so slots are reclaimed when the next draw opens.
+The winner-selection implementation is intentionally bounded and supports at most 256 entrants per draw. Enrollment is draw-scoped, so a full historical draw cannot block a newer draw. Aggregate principal and prize custody are confidentially capped before inbound ERC-7984 transfers to prevent `euint64` wraparound.
+
+The continuous-draw contracts are a breaking migration. The active manifests reference the verified replacement pools and capacity-aware reward vaults above. Earlier Sepolia addresses remain historical evidence and must not be treated as compatible with the new ABI.

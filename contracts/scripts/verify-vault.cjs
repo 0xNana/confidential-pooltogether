@@ -7,6 +7,7 @@ const deployment = require(`../deployments/${token.vaultDeploymentFile}`)
 async function main() {
   if (deployment.apyAccounting !== true) throw new Error("Deployment manifest says APY accounting is not active")
   if (deployment.rewardAccrualModel !== "encrypted-time-weighted-v2") throw new Error("Deployment manifest does not use time-weighted APY accounting")
+  if (deployment.prizeCapacityModel !== "encrypted-pool-capacity-handshake-v1") throw new Error("Deployment manifest does not use the encrypted prize-capacity handshake")
   if (!deployment.prizePool) throw new Error("Deployment manifest has no prizePool address")
 
   const code = await hre.ethers.provider.getCode(deployment.vault)
@@ -28,6 +29,7 @@ async function main() {
   if (!vault.interface.hasFunction("accruedReward")) throw new Error("Vault has no encrypted accrued reward getter")
   if (!vault.interface.hasFunction("fundRewards")) throw new Error("Vault has no encrypted reward funding function")
   if (!vault.interface.hasFunction("fundPrizePool")) throw new Error("Vault has no prize-pool funding function")
+  if (!pool.interface.hasFunction("preparePrizeCapacity")) throw new Error("Prize pool has no encrypted funding-capacity handshake")
   if (asset.toLowerCase() !== deployment.asset.toLowerCase()) throw new Error("Vault asset mismatch")
   if (asset.toLowerCase() !== token.asset.toLowerCase()) throw new Error(`Vault is not bound to official Zama ${token.confidentialSymbol}`)
   if (rewardSource.toLowerCase() !== deployment.vault.toLowerCase()) throw new Error("Prize pool reward source is not the Liquidity Hunt vault")

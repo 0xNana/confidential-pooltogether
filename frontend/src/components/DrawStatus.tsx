@@ -11,20 +11,16 @@ type DrawStatusProps = Pick<
 export function DrawStatus(props: DrawStatusProps) {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
   const { poolState } = props
+  const { currentDraw } = poolState
 
   useEffect(() => {
-    if (poolState.phase === 1) return
     const interval = window.setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1_000)
     return () => window.clearInterval(interval)
-  }, [poolState.claimClosesAt, poolState.drawClosesAt, poolState.phase])
+  }, [currentDraw.scheduledClose, poolState.claimDraw?.claimExpiresAt])
 
-  const scheduleLabel = poolState.phase === 0 ? "Draw closes in" : poolState.phase === 2 ? "Claims close in" : "Draw schedule"
-  const scheduleValue = poolState.phase === 0
-    ? formatCountdown(poolState.drawClosesAt - now)
-    : poolState.phase === 2
-      ? formatCountdown(poolState.claimClosesAt - now, "Closed")
-      : "Lifecycle active"
-  const lifecycle = deriveDrawLifecycle(poolState, now)
+  const scheduleLabel = "Entry draw closes in"
+  const scheduleValue = formatCountdown(currentDraw.scheduledClose - now)
+  const lifecycle = deriveDrawLifecycle(currentDraw, poolState.historicalDraws, now)
   const lifecycleBusy = props.operation.kind === "lifecycle" && ["signature", "pending"].includes(props.operation.stage)
   const actionLabel = !lifecycle.ready
     ? lifecycle.label
@@ -47,11 +43,11 @@ export function DrawStatus(props: DrawStatusProps) {
       data-testid="live-draw"
       data-state={props.loading ? "loading" : props.readError ? "error" : "ready"}
     >
-      <div className="draw-console-metric draw-state"><CircleDot size={17} /><span><small>Draw #{props.loading ? "-" : poolState.drawId}</small><strong>{props.loading ? "Syncing" : poolState.phaseLabel}</strong></span></div>
-      <div className="draw-console-metric"><Users size={17} /><span><small>Participants</small><strong>{props.loading ? "-" : poolState.participantCount}</strong></span></div>
+      <div className="draw-console-metric draw-state"><CircleDot size={17} /><span><small>Entry draw #{props.loading ? "-" : currentDraw.drawId}</small><strong>{props.loading ? "Syncing" : currentDraw.statusLabel}</strong></span></div>
+      <div className="draw-console-metric"><Users size={17} /><span><small>Participants</small><strong>{props.loading ? "-" : currentDraw.participantCount}</strong></span></div>
       <div className="draw-console-metric"><CalendarClock size={17} /><span><small>{scheduleLabel}</small><strong>{props.loading ? "-" : scheduleValue}</strong></span></div>
       <div className="draw-console-metric snapshot"><LockKeyhole size={17} /><span><small>Prize pool</small><strong>Encrypted</strong></span></div>
-      <div className={`claim-status ${poolState.claimable ? "ready" : "waiting"}`}><CheckCircle2 size={16} /><span>{poolState.claimable ? "Claims open" : poolState.phase === 2 ? "Window closed" : "Prize sealed"}</span></div>
+      <div className={`claim-status ${poolState.claimDraw ? "ready" : "waiting"}`}><CheckCircle2 size={16} /><span>{poolState.claimDraw ? `Draw #${poolState.claimDraw.drawId} claims open` : "No private claim ready"}</span></div>
       <div className="lifecycle-control">
         <span className="lifecycle-icon">{lifecycle.kind === "continue" ? <ScanLine size={18} /> : lifecycleBusy ? <LoaderCircle className="spin" size={18} /> : <Wallet size={18} />}</span>
         <div className="lifecycle-copy">

@@ -36,11 +36,11 @@ Frontend activity UI
 
 ### `ConfidentialPrizePool`
 
-The prize pool accepts confidential token deposits, tracks encrypted principal, snapshots encrypted draw weights, selects an encrypted winner, and lets each participant privately preview and claim prize-or-zero.
+The prize pool accepts confidential token deposits, tracks encrypted principal, incrementally maintains per-draw encrypted weights, selects an encrypted winner, and lets each participant privately preview and claim prize-or-zero from historical draws.
 
-Public metadata includes draw id, phase, deadlines, participant count, scan cursor, and lifecycle events.
+Public metadata includes draw ID, status, epoch-aligned open/close times, claim times, participant count, scan cursor, and lifecycle events. `currentDrawId` refers only to the draw accepting entries.
 
-Private state includes principal balances, snapshot weights, aggregate totals, winner identity, prize reserve, and prize-or-zero result.
+Private state includes principal balances, draw weights, draw aggregate totals, full-width random threshold, cumulative scan state, winner identity, prize reserve, and prize-or-zero result.
 
 ### `ConfidentialLiquidityVault`
 

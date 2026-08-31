@@ -1,82 +1,76 @@
 {
-  "checkedAt": "2026-08-26T13:15:47.533Z",
+  "checkedAt": "2026-08-31T17:07:27.951Z",
   "network": "sepolia",
   "rpcPolicy": "public-only",
   "market": "cUSDC",
   "addresses": {
-    "pool": "0x0Df09628bAdA515D3b0A3AC8945120C14C725819",
-    "vault": "0x4f7fB215FCB6926Cdae216F6E65Cc8ffF7faF185",
+    "pool": "0x66fCF1bB6C790176c770FaC028994fD375bF27ad",
+    "vault": "0x09e250E6105EB21053D32dbB705d836bAd8EC041",
     "asset": "0x7c5BF43B851c1dff1a4feE8dB225b87f2C223639"
   },
   "target": {
     "drawId": 1,
     "principal": "1000.0",
     "directPrize": "29.5",
-    "deterministicSingleEntrant": false
+    "deterministicSingleEntrant": true
   },
   "state": {
     "currentDrawId": 1,
-    "phase": 0,
-    "participantCount": 0,
-    "drawClosesAt": "2026-09-02T11:55:00.000Z",
-    "claimClosesAt": null,
-    "hasDeposit": false,
-    "hasPrizeFunding": false,
+    "targetStatus": 0,
+    "participantCount": 1,
+    "scheduledClose": "2026-09-01T14:13:48.000Z",
+    "claimExpiresAt": null,
+    "hasDeposit": true,
+    "hasPrizeFunding": true,
     "hasClaim": false,
     "hasWithdrawal": false,
-    "hasNextDraw": false
+    "historicalOverlap": false
   },
   "incompleteTasks": [
     {
-      "id": "deposit",
-      "label": "Deposit encrypted test principal",
-      "ready": true,
-      "blockedBy": null
-    },
-    {
-      "id": "fund-prize",
-      "label": "Fund an encrypted direct testnet prize",
-      "ready": true,
-      "blockedBy": null
-    },
-    {
       "id": "close-draw",
-      "label": "Close the funded draw",
+      "label": "Finalize the funded entry draw",
       "ready": false,
-      "blockedBy": "deposit and prize funding are required"
-    },
-    {
-      "id": "select-winner",
-      "label": "Complete bounded winner selection",
-      "ready": false,
-      "blockedBy": "draw must be selecting"
+      "blockedBy": "wait until 2026-09-01T14:13:48.000Z"
     },
     {
       "id": "claim-prize",
-      "label": "Preview and claim the prize with the participant signer",
+      "label": "Preview and claim the historical prize",
       "ready": false,
-      "blockedBy": "draw must be inside its claim window"
+      "blockedBy": "target draw must be inside its claim window"
     },
     {
       "id": "withdraw-principal",
       "label": "Withdraw the participant's test principal",
       "ready": false,
       "blockedBy": "successful claim submission is required first"
-    },
-    {
-      "id": "open-next-draw",
-      "label": "Open the next draw after the claim window",
-      "ready": false,
-      "blockedBy": "draw must be claimable"
     }
   ],
   "submitted": [],
   "eventTransactions": [
     {
       "event": "DrawOpened",
-      "hash": "0xb3489f00fff160fd0ac2aa1cfc4dfc13cd33b62bbc406de96d2fb6bde5394418",
-      "blockNumber": 11570713,
-      "url": "https://sepolia.etherscan.io/tx/0xb3489f00fff160fd0ac2aa1cfc4dfc13cd33b62bbc406de96d2fb6bde5394418"
+      "hash": "0x32af0b29a3c201c81a715a3aa0fa4ba3e0a334e36aa7097a8ef529575e657c98",
+      "blockNumber": 11606203,
+      "url": "https://sepolia.etherscan.io/tx/0x32af0b29a3c201c81a715a3aa0fa4ba3e0a334e36aa7097a8ef529575e657c98"
+    },
+    {
+      "event": "DrawEntered",
+      "hash": "0xa85e22116c9e06aa59126566db2a62fbd3b5093ec92c66758a31b5fa8e577453",
+      "blockNumber": 11606377,
+      "url": "https://sepolia.etherscan.io/tx/0xa85e22116c9e06aa59126566db2a62fbd3b5093ec92c66758a31b5fa8e577453"
+    },
+    {
+      "event": "DepositRecorded",
+      "hash": "0xa85e22116c9e06aa59126566db2a62fbd3b5093ec92c66758a31b5fa8e577453",
+      "blockNumber": 11606377,
+      "url": "https://sepolia.etherscan.io/tx/0xa85e22116c9e06aa59126566db2a62fbd3b5093ec92c66758a31b5fa8e577453"
+    },
+    {
+      "event": "PrizeFunded",
+      "hash": "0x6279f79fa7391350ac314aaac3df85d164f41a0f002136cb3f080ce196bd62c1",
+      "blockNumber": 11606383,
+      "url": "https://sepolia.etherscan.io/tx/0x6279f79fa7391350ac314aaac3df85d164f41a0f002136cb3f080ce196bd62c1"
     }
   ],
   "remainingHumanEvidence": [

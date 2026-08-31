@@ -16,14 +16,14 @@ Official brief: https://forms.zama.org/developer-program-mainnet-season4-bounty-
 
 | Item | Status | Notes |
 | --- | --- | --- |
-| Smart contracts | Done | cUSDT and cUSDC Sepolia prize pools deployed and verified. |
-| Frontend | Done | Multi-market vault workspace is wired for cUSDT and cUSDC. |
-| Reward vaults | Done for demo | Liquidity Hunt reward reserves are deployed and seeded as simulated APY sources. |
-| Permissionless draw lifecycle | Done | `closeDraw()`, `continueSelection()`, and `openNextDraw()` are permissionless. |
+| Smart contracts | Deployed and source-verified | Replacement cUSDT and cUSDC pools expose the verified daily overlapping lifecycle. |
+| Frontend | Live-manifest smoke passed | Generated pool/vault manifests match the contract deployment records. |
+| Reward vaults | Deployed and bound | Both pools use capacity-aware encrypted reward funding. |
+| Permissionless draw lifecycle | Done locally | `closeDraw()`, `continueSelection(drawId, maxAccounts)`, `expireDraw(drawId)`, and `sweepExpiredPrize(drawId)` are permissionless. |
 | Public demo URL | Missing | Add final hosted URL to `README.md` before submission. |
 | Video pitch | Missing | Record a human walkthrough. |
 | X thread or article | Missing | Publish and link it. |
-| Live Sepolia e2e proof | Recommended | Record a real wallet flow using both markets. |
+| Live Sepolia e2e proof | In progress | Both draw-1 entry/prize checkpoints are recorded; finalization, selection, claim, withdrawal, and HCU timing wait for the fixed 2026-09-01 cutoffs. |
 
 ## Video Outline
 

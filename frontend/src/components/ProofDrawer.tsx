@@ -26,11 +26,14 @@ export function ProofDrawer({ open, onClose, poolState, market }: ProofDrawerPro
 
   if (!open) return null
 
+  const focusDraw = poolState.claimDraw
+    ?? poolState.historicalDraws.find((draw) => draw.status === 1)
+    ?? poolState.currentDraw
   const checks = [
     { title: "Vault is live", detail: `The confidential prize vault is running on Sepolia${poolState.deploymentBlock ? ` from block ${poolState.deploymentBlock.toLocaleString()}` : ""}.`, complete: true },
-    { title: "Entries are locked in", detail: "Deposits are included in the draw without exposing anyone's amount.", complete: poolState.phase >= 1 },
-    { title: "Winner selection is private", detail: "The draw uses encrypted balances and keeps the winner hidden.", complete: poolState.phase >= 1 },
-    { title: "Prize results are ready", detail: "Participants can check their private result without revealing anyone else's.", complete: poolState.claimable },
+    { title: "Entries are locked in", detail: "Deposits are included in the draw without exposing anyone's amount.", complete: focusDraw.status >= 1 },
+    { title: "Winner selection is private", detail: "The draw uses encrypted balances and keeps the winner hidden.", complete: focusDraw.status >= 1 },
+    { title: "Prize results are ready", detail: "Participants can check their private result without revealing anyone else's.", complete: focusDraw.status >= 2 },
   ]
   const completeCount = checks.filter((check) => check.complete).length
 
@@ -38,19 +41,19 @@ export function ProofDrawer({ open, onClose, poolState, market }: ProofDrawerPro
     <div className="drawer-layer" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <aside className="proof-drawer" role="dialog" aria-modal="true" aria-labelledby="proof-title">
         <header className="drawer-header">
-          <div><p className="eyebrow">Draw details</p><h2 id="proof-title">Draw #{String(poolState.drawId).padStart(3, "0")}</h2></div>
+          <div><p className="eyebrow">Draw details</p><h2 id="proof-title">Draw #{String(focusDraw.drawId).padStart(3, "0")}</h2></div>
           <button ref={closeRef} className="icon-button" type="button" onClick={onClose} aria-label="Close verification record" data-testid="close-proof"><X size={19} /></button>
         </header>
 
-        <div className={`verification-seal ${poolState.claimable ? "complete" : "progress"}`}>
+        <div className={`verification-seal ${focusDraw.status >= 2 ? "complete" : "progress"}`}>
           <ShieldCheck size={25} />
-          <div><strong>{poolState.claimable ? "Draw complete" : "Draw in progress"}</strong><span>{completeCount} of {checks.length} steps complete</span></div>
+          <div><strong>{focusDraw.status >= 2 ? "Draw complete" : "Draw in progress"}</strong><span>{completeCount} of {checks.length} steps complete</span></div>
         </div>
 
         <dl className="proof-meta">
           <div><dt>Network</dt><dd>Ethereum Sepolia</dd></div>
           <div><dt>Vault address</dt><dd className="mono">{shortAddress(market.poolAddress)}</dd></div>
-          <div><dt>Entries</dt><dd>{poolState.participantCount}</dd></div>
+          <div><dt>Entries</dt><dd>{focusDraw.participantCount}</dd></div>
           <div><dt>Security</dt><dd>Testnet · not audited</dd></div>
         </dl>
 

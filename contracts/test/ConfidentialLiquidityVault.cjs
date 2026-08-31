@@ -107,6 +107,61 @@ describe("ConfidentialLiquidityVault", function () {
     assert.equal(await decryptRewardReserve(vaultAddress, owner), 100_000_000n - expectedReward)
     assert.equal(await decryptAccruedReward(vaultAddress, owner), 0n)
   })
+
+  it("retains rewards when the prize pool reports zero encrypted custody capacity", async function () {
+    const { owner, alice, prizePoolAddress, vault, vaultAddress } = await deployRewardFixture()
+    const token = await hre.ethers.getContractAt("ConfidentialTokenFixture", await vault.asset())
+    const tokenAddress = await token.getAddress()
+    const prizePool = await hre.ethers.getContractAt("ConfidentialPrizePool", prizePoolAddress)
+    const prizeCap = await prizePool.MAX_PRIZE_RESERVES()
+
+    await mint(tokenAddress, owner.address, owner.address, prizeCap)
+    await (await token.connect(owner).setOperator(prizePoolAddress, 4_102_444_800)).wait()
+    await fundPrize(prizePoolAddress, owner, prizeCap)
+
+    const principal = 1_000_000_000n
+    const reserve = 100_000_000n
+    await deposit(vaultAddress, alice, principal)
+    await fundRewards(vaultAddress, owner, reserve)
+    const accrualStartedAt = await vault.lastAccruedAt()
+
+    await advanceBy(90 * DAY)
+    const receipt = await (await vault.fundPrizePool(prizePoolAddress)).wait()
+    const fundedAt = await blockTimestamp(receipt)
+
+    assert.equal(await decryptRewardReserve(vaultAddress, owner), reserve)
+    assert.equal(await decryptAccruedReward(vaultAddress, owner), rewardFor(principal, fundedAt - accrualStartedAt))
+  })
+
+  it("routes reward-source funding at the exact pool cutoff into the new aligned draw", async function () {
+    const { owner, alice, prizePoolAddress, vault, vaultAddress } = await deployRewardFixture()
+    const pool = await hre.ethers.getContractAt("ConfidentialPrizePool", prizePoolAddress)
+    const tokenAddress = await vault.asset()
+    const token = await hre.ethers.getContractAt("ConfidentialTokenFixture", tokenAddress)
+    const principal = 1_000_000_000n
+    const reserve = 100_000_000n
+
+    await deposit(vaultAddress, alice, principal)
+    await fundRewards(vaultAddress, owner, reserve)
+    const accruedFrom = await vault.lastAccruedAt()
+    const cutoff = (await pool.drawMetadata(1)).scheduledClose
+    await hre.network.provider.send("evm_setNextBlockTimestamp", [Number(cutoff)])
+    const fundingReceipt = await (await vault.fundPrizePool(prizePoolAddress)).wait()
+    const fundedAt = await blockTimestamp(fundingReceipt)
+    const expectedPrize = rewardFor(principal, fundedAt - accruedFrom)
+
+    assert.equal(await pool.currentDrawId(), 2n)
+    assert.equal((await pool.drawMetadata(1)).status, 2n)
+    await (await token.connect(alice).setOperator(prizePoolAddress, 4_102_444_800)).wait()
+    await poolDeposit(prizePoolAddress, alice, 100_000_000n)
+    await hre.network.provider.send("evm_setNextBlockTimestamp", [Number((await pool.drawMetadata(2)).scheduledClose)])
+    await (await pool.closeDraw()).wait()
+    await (await pool.continueSelection(2, 12)).wait()
+
+    await (await pool.connect(alice).previewPrize(2)).wait()
+    const handle = await pool.prizePreviewOf(2, alice.address)
+    assert.equal(await hre.fhevm.userDecryptEuint(FhevmType.euint64, handle, prizePoolAddress, alice), expectedPrize)
+  })
 })
 
 async function deployRewardFixture() {
@@ -172,6 +227,22 @@ async function fundRewards(vaultAddress, signer, amount) {
   const encrypted = await input.encrypt()
   const vault = await hre.ethers.getContractAt("ConfidentialLiquidityVault", vaultAddress)
   await (await vault.connect(signer).fundRewards(encrypted.handles[0], encrypted.inputProof)).wait()
+}
+
+async function fundPrize(poolAddress, signer, amount) {
+  const input = hre.fhevm.createEncryptedInput(poolAddress, signer.address)
+  input.add64(amount)
+  const encrypted = await input.encrypt()
+  const pool = await hre.ethers.getContractAt("ConfidentialPrizePool", poolAddress)
+  await (await pool.connect(signer).fundPrize(encrypted.handles[0], encrypted.inputProof)).wait()
+}
+
+async function poolDeposit(poolAddress, signer, amount) {
+  const input = hre.fhevm.createEncryptedInput(poolAddress, signer.address)
+  input.add64(amount)
+  const encrypted = await input.encrypt()
+  const pool = await hre.ethers.getContractAt("ConfidentialPrizePool", poolAddress)
+  await (await pool.connect(signer).deposit(encrypted.handles[0], encrypted.inputProof)).wait()
 }
 
 async function decryptPrincipal(vaultAddress, signer) {

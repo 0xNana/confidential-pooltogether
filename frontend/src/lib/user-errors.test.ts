@@ -13,7 +13,8 @@ describe("toUserError", () => {
   it("maps wallet and lifecycle errors to actionable copy", () => {
     expect(toUserError(new Error("ACTION_REJECTED"), "fallback")).toBe("Request cancelled in wallet.")
     expect(toUserError(new Error("execution reverted: DrawStillOpen"), "fallback")).toBe("This draw has not reached its deadline yet.")
-    expect(toUserError(new Error("execution reverted: EmptyPool"), "fallback")).toBe("A deposit is required before this draw can close.")
+    expect(toUserError(new Error("execution reverted: ClaimExpired(1)"), "fallback")).toBe("This historical claim window has closed.")
+    expect(toUserError(new Error("superseded draw ABI"), "fallback")).toBe("This market is waiting for its continuous-draw replacement deployment.")
     expect(toUserError(new Error("execution reverted: ParticipantLimitReached"), "fallback")).toBe("This draw is full. Your balance remains withdrawable; enter the next draw.")
   })
 })

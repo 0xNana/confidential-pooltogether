@@ -32,16 +32,21 @@ async function main() {
   let rewardSource = null
   let rewardSourceTransactionHash = null
   if (fs.existsSync(vaultDeploymentPath)) {
-    vaultDeployment = JSON.parse(fs.readFileSync(vaultDeploymentPath, "utf8"))
-    const vaultCode = await hre.ethers.provider.getCode(vaultDeployment.vault)
-    if (vaultCode === "0x") throw new Error(`No liquidity vault deployed at ${vaultDeployment.vault}`)
-    const vault = new hre.ethers.Contract(vaultDeployment.vault, ["function asset() view returns (address)"], hre.ethers.provider)
-    const vaultAsset = await vault.asset()
-    if (vaultAsset.toLowerCase() !== asset.toLowerCase()) throw new Error("Liquidity vault asset mismatch")
-    const rewardSourceTx = await pool.setRewardSource(vaultDeployment.vault)
-    await rewardSourceTx.wait()
-    rewardSource = vaultDeployment.vault
-    rewardSourceTransactionHash = rewardSourceTx.hash
+    const candidate = JSON.parse(fs.readFileSync(vaultDeploymentPath, "utf8"))
+    if (candidate.prizeCapacityModel === "encrypted-pool-capacity-handshake-v1") {
+      vaultDeployment = candidate
+      const vaultCode = await hre.ethers.provider.getCode(vaultDeployment.vault)
+      if (vaultCode === "0x") throw new Error(`No liquidity vault deployed at ${vaultDeployment.vault}`)
+      const vault = new hre.ethers.Contract(vaultDeployment.vault, ["function asset() view returns (address)"], hre.ethers.provider)
+      const vaultAsset = await vault.asset()
+      if (vaultAsset.toLowerCase() !== asset.toLowerCase()) throw new Error("Liquidity vault asset mismatch")
+      const rewardSourceTx = await pool.setRewardSource(vaultDeployment.vault)
+      await rewardSourceTx.wait()
+      rewardSource = vaultDeployment.vault
+      rewardSourceTransactionHash = rewardSourceTx.hash
+    } else {
+      console.warn("Existing reward vault uses the superseded funding ABI; deploy a replacement vault before binding it.")
+    }
   }
 
   const deployment = {
@@ -53,7 +58,13 @@ async function main() {
     asset,
     underlying,
     pool: poolAddress,
-    privacyModel: "private-aggregate-v4-draw-scoped",
+    privacyModel: "continuous-confidential-draws-v1",
+    lifecycleModel: "epoch-aligned-daily-overlap",
+    drawPeriodSeconds: Number(await pool.DRAW_PERIOD()),
+    claimPeriodSeconds: Number(await pool.CLAIM_PERIOD()),
+    drawEpoch: (await pool.drawEpoch()).toString(),
+    maxPoolPrincipal: (await pool.MAX_POOL_PRINCIPAL()).toString(),
+    maxPrizeReserves: (await pool.MAX_PRIZE_RESERVES()).toString(),
     drawScopedEnrollment: true,
     rewardSource,
     rewardSourceConfigured: Boolean(rewardSource),

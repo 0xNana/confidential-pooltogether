@@ -50,8 +50,8 @@ async function main() {
   const needsVaultPrincipal = vaultDeposits.length === 0
   const needsRewardReserve = rewardsFunded.length === 0
   const needsPrizeFunding = prizesFunded.length === 0
-  const currentPhase = Number(await pool.phase())
-  if (needsPoolPrincipal && currentPhase !== 0) throw new Error("Pool principal is missing, but the current draw is not open")
+  const currentMetadata = await pool.currentDrawMetadata()
+  if (needsPoolPrincipal && Number(currentMetadata.status) !== 0) throw new Error("Pool principal is missing, but the current draw is not open")
 
   const [lastRewardFundedAt, rewardFundingCooldown, latestBlockData] = await Promise.all([
     vault.lastRewardFundedAt(),
@@ -73,8 +73,9 @@ async function main() {
     deployer: deployer.address,
     pool: poolDeployment.pool,
     vault: vaultDeployment.vault,
-    drawId: (await pool.drawId()).toString(),
-    phase: currentPhase,
+    currentDrawId: (await pool.currentDrawId()).toString(),
+    currentStatus: Number(currentMetadata.status),
+    scheduledClose: currentMetadata.scheduledClose.toString(),
     actions: {
       wrapAmount: hre.ethers.formatUnits(wrapAmount, 6),
       depositPoolPrincipal: needsPoolPrincipal ? hre.ethers.formatUnits(POOL_PRINCIPAL, 6) : "skip: event exists",

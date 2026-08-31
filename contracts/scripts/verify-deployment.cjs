@@ -9,14 +9,16 @@ async function main() {
   if (code === "0x") throw new Error(`No bytecode at ${deployment.pool}`)
 
   const pool = await hre.ethers.getContractAt("ConfidentialPrizePool", deployment.pool)
-  const [asset, owner, drawId, phase, drawClosesAt, drawPeriod, claimPeriod, protocolId, participantCount, maxParticipants, rewardSource] = await Promise.all([
+  const [asset, owner, currentDrawId, currentMetadata, drawEpoch, drawPeriod, claimPeriod, maxPrincipal, maxPrizeReserves, protocolId, participantCount, maxParticipants, rewardSource] = await Promise.all([
     pool.asset(),
     pool.owner(),
-    pool.drawId(),
-    pool.phase(),
-    pool.drawClosesAt(),
+    pool.currentDrawId(),
+    pool.currentDrawMetadata(),
+    pool.drawEpoch(),
     pool.DRAW_PERIOD(),
     pool.CLAIM_PERIOD(),
+    pool.MAX_POOL_PRINCIPAL(),
+    pool.MAX_PRIZE_RESERVES(),
     pool.confidentialProtocolId(),
     pool.participantCount(),
     pool.MAX_PARTICIPANTS(),
@@ -26,11 +28,16 @@ async function main() {
   if (asset.toLowerCase() !== deployment.asset.toLowerCase()) throw new Error("Asset address mismatch")
   if (asset.toLowerCase() !== token.asset.toLowerCase()) throw new Error(`Pool is not bound to official Zama ${token.confidentialSymbol}`)
   if (owner.toLowerCase() !== deployment.deployer.toLowerCase()) throw new Error("Owner address mismatch")
+  if (drawPeriod !== 86_400n) throw new Error("Draw period is not the required daily cadence")
+  if (currentMetadata.status !== 0n) throw new Error("currentDrawId does not identify an Open draw")
+  if (currentMetadata.scheduledOpen < drawEpoch || currentMetadata.scheduledClose - currentMetadata.scheduledOpen !== drawPeriod) {
+    throw new Error("Current draw is not aligned to the deployment epoch")
+  }
   if (pool.interface.hasFunction("snapshotTotal") || pool.interface.hasFunction("finalizeSnapshot")) {
     throw new Error("Deployment exposes the retired public aggregate flow")
   }
-  if (deployment.privacyModel === "private-aggregate-v4-draw-scoped") {
-    if (!pool.interface.hasFunction("enterDraw") || !pool.interface.hasFunction("isEntered")) {
+  if (deployment.privacyModel === "continuous-confidential-draws-v1") {
+    if (!pool.interface.hasFunction("enterDraw") || !pool.interface.hasFunction("isEntered(uint64,address)")) {
       throw new Error("V4 deployment is missing draw-scoped enrollment")
     }
     if (maxParticipants !== 256n) throw new Error("Unexpected per-draw participant bound")
@@ -55,17 +62,21 @@ async function main() {
     assetSymbol: symbol,
     underlying,
     owner,
-    drawId: drawId.toString(),
-    phase: phase.toString(),
-    drawClosesAt: drawClosesAt.toString(),
+    currentDrawId: currentDrawId.toString(),
+    currentStatus: currentMetadata.status.toString(),
+    scheduledOpen: currentMetadata.scheduledOpen.toString(),
+    scheduledClose: currentMetadata.scheduledClose.toString(),
+    drawEpoch: drawEpoch.toString(),
     drawPeriod: drawPeriod.toString(),
     claimPeriod: claimPeriod.toString(),
+    maxPoolPrincipal: maxPrincipal.toString(),
+    maxPrizeReserves: maxPrizeReserves.toString(),
     participantCount: participantCount.toString(),
     maxParticipants: maxParticipants.toString(),
-    drawScopedEnrollment: deployment.privacyModel === "private-aggregate-v4-draw-scoped",
+    drawScopedEnrollment: deployment.privacyModel === "continuous-confidential-draws-v1",
     rewardSource,
     aggregateDisclosure: "none",
-    encryptedRollover: true,
+    encryptedHistoricalSweep: true,
     confidentialProtocolId: protocolId.toString(),
   }, null, 2))
 }

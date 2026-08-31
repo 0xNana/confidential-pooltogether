@@ -2,7 +2,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { createClient } from "@supabase/supabase-js"
-import { Interface, JsonRpcProvider } from "ethers"
+import { Contract, Interface, JsonRpcProvider } from "ethers"
 
 const backendDirectory = path.dirname(fileURLToPath(import.meta.url))
 const contractsDirectory = path.join(backendDirectory, "..", "contracts")
@@ -24,15 +24,18 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
 })
 const contractInterface = new Interface(artifact.abi)
+const pool = new Contract(deployment.pool, artifact.abi, provider)
 const labels = {
   DepositRecorded: "Encrypted deposit accepted",
   WithdrawalRecorded: "Principal withdrawal recorded",
   PrizeFunded: "Yield entered the prize reserve",
   DrawOpened: "New private draw opened",
-  DrawSelectionStarted: "Verifiable selection started",
-  DrawSelectionProgress: "Encrypted winner scan advanced",
+  DrawEntered: "Account entered the private draw",
+  DrawFinalized: "Entry period finalized",
+  SelectionProgress: "Encrypted winner scan advanced",
   DrawClaimable: "Private prize claims enabled",
-  PrizeRolledOver: "Encrypted prize reserve rolled forward",
+  DrawExpired: "Private claim window expired",
+  PrizeSwept: "Encrypted prize reserve swept forward",
   PrizeClaimAttempted: "Prize-or-zero claim submitted",
 }
 
@@ -63,6 +66,12 @@ while (fromBlock <= finalizedBlock) {
       ignoreDuplicates: true,
     })
     if (error) throw error
+    const drawIds = new Set(rows.flatMap((row) => [row.draw_id, row.metadata.target_draw_id]).filter(Boolean))
+    const drawRows = await Promise.all([...drawIds].map((drawId) => serializeDraw(drawId)))
+    const { error: drawError } = await supabase.from("pool_draws").upsert(drawRows, {
+      onConflict: "chain_id,contract_address,draw_id",
+    })
+    if (drawError) throw drawError
     indexed += rows.length
   }
 
@@ -75,6 +84,8 @@ while (fromBlock <= finalizedBlock) {
   if (checkpointError) throw checkpointError
   fromBlock = toBlock + 1
 }
+
+await syncCurrentReadModel()
 
 console.log(JSON.stringify({ chainId, contract: deployment.pool, finalizedBlock, indexed }, null, 2))
 
@@ -100,7 +111,7 @@ function serializeLog(log) {
   }
   if (!parsed || !labels[parsed.name]) return []
 
-  const drawId = parsed.args.drawId ?? parsed.args.toDrawId
+  const drawId = parsed.args.drawId ?? parsed.args.sourceDrawId ?? parsed.args.targetDrawId
   return [{
     chain_id: chainId,
     contract_address: contractAddress,
@@ -115,12 +126,51 @@ function serializeLog(log) {
 }
 
 function publicMetadata(parsed) {
-  if (parsed.name === "DrawOpened") return { closes_at: Number(parsed.args.closesAt) }
-  if (parsed.name === "DrawClaimable") return { claim_closes_at: Number(parsed.args.claimClosesAt) }
-  if (parsed.name === "DrawSelectionStarted") return { participant_count: Number(parsed.args.participantCount) }
-  if (parsed.name === "DrawSelectionProgress") {
+  if (parsed.name === "DrawOpened") {
+    return { scheduled_open: Number(parsed.args.scheduledOpen), scheduled_close: Number(parsed.args.scheduledClose) }
+  }
+  if (parsed.name === "DrawClaimable") {
+    return { claimable_at: Number(parsed.args.claimableAt), claim_expires_at: Number(parsed.args.claimExpiresAt) }
+  }
+  if (parsed.name === "DrawFinalized") return { participant_count: Number(parsed.args.participantCount) }
+  if (parsed.name === "SelectionProgress") {
     return { cursor: Number(parsed.args.cursor), participant_count: Number(parsed.args.participantCount) }
   }
-  if (parsed.name === "PrizeRolledOver") return { from_draw_id: Number(parsed.args.fromDrawId) }
+  if (parsed.name === "PrizeSwept") return { target_draw_id: Number(parsed.args.targetDrawId) }
   return {}
+}
+
+async function serializeDraw(drawId) {
+  const metadata = await pool.drawMetadata(drawId)
+  return {
+    chain_id: chainId,
+    contract_address: contractAddress,
+    draw_id: drawId,
+    scheduled_open: Number(metadata.scheduledOpen),
+    scheduled_close: Number(metadata.scheduledClose),
+    claimable_at: Number(metadata.claimableAt) || null,
+    claim_expires_at: Number(metadata.claimExpiresAt) || null,
+    participant_count: Number(metadata.participantCount),
+    scan_cursor: Number(metadata.scanCursor),
+    status: Number(metadata.status),
+    updated_at: new Date().toISOString(),
+  }
+}
+
+async function syncCurrentReadModel() {
+  const [currentDrawIdRaw, actionableCountRaw] = await Promise.all([
+    pool.currentDrawId(),
+    pool.actionableDrawCount(),
+  ])
+  const ids = new Set([Number(currentDrawIdRaw)])
+  const count = Number(actionableCountRaw)
+  for (let offset = 0; offset < count; offset += 32) {
+    const page = await pool.actionableDrawIds(offset, 32)
+    for (const id of page) ids.add(Number(id))
+  }
+  const rows = await Promise.all([...ids].map((drawId) => serializeDraw(drawId)))
+  const { error } = await supabase.from("pool_draws").upsert(rows, {
+    onConflict: "chain_id,contract_address,draw_id",
+  })
+  if (error) throw error
 }

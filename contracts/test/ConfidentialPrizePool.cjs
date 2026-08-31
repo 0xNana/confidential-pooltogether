@@ -45,11 +45,12 @@ describe("ConfidentialPrizePool", function () {
     assert.equal(pool.interface.hasFunction("finalizeSnapshot"), false)
 
     await assert.rejects(pool.connect(alice).closeDraw())
-    await advanceTo(await pool.drawClosesAt())
+    await advanceTo((await pool.currentDrawMetadata()).scheduledClose)
     await (await pool.connect(alice).closeDraw()).wait()
 
-    assert.equal(await pool.phase(), 1n)
-    assert.equal(await pool.scanCursor(), 0n)
+    const metadata = await pool.drawMetadata(1)
+    assert.equal(metadata.status, 1n)
+    assert.equal(metadata.scanCursor, 0n)
   })
 
   it("selects exactly one private winner without publishing the pool total", async function () {
@@ -64,11 +65,11 @@ describe("ConfidentialPrizePool", function () {
     await deposit(pool, poolAddress, alice, 100_000_000n)
     await deposit(pool, poolAddress, bob, 300_000_000n)
     await fundPrize(pool, poolAddress, owner, 50_000_000n)
-    await advanceTo(await pool.drawClosesAt())
+    await advanceTo((await pool.currentDrawMetadata()).scheduledClose)
     await (await pool.closeDraw()).wait()
-    await (await pool.continueSelection(12)).wait()
+    await (await pool.continueSelection(1, 12)).wait()
 
-    assert.equal(await pool.drawClaimable(1), true)
+    assert.equal((await pool.drawMetadata(1)).status, 2n)
     const alicePrize = await previewAndDecryptPrize(pool, poolAddress, alice, 1)
     const bobPrize = await previewAndDecryptPrize(pool, poolAddress, bob, 1)
     assert.deepEqual([alicePrize, bobPrize].sort(), [0n, 50_000_000n])
@@ -87,9 +88,9 @@ describe("ConfidentialPrizePool", function () {
     await deposit(pool, poolAddress, alice, 100_000_000n)
     await deposit(pool, poolAddress, bob, 300_000_000n)
     await fundPrize(pool, poolAddress, owner, 50_000_000n)
-    await advanceTo(await pool.drawClosesAt())
+    await advanceTo((await pool.currentDrawMetadata()).scheduledClose)
     await (await pool.closeDraw()).wait()
-    await (await pool.continueSelection(12)).wait()
+    await (await pool.continueSelection(1, 12)).wait()
 
     const alicePrize = await previewAndDecryptPrize(pool, poolAddress, alice, 1)
     const bobPrize = await previewAndDecryptPrize(pool, poolAddress, bob, 1)
@@ -128,23 +129,29 @@ describe("ConfidentialPrizePool", function () {
     await deposit(pool, poolAddress, alice, 100_000_000n)
     await withdraw(pool, poolAddress, alice, 100_000_000n)
     await fundPrize(pool, poolAddress, owner, 50_000_000n)
-    await advanceTo(await pool.drawClosesAt())
+    await advanceTo((await pool.currentDrawMetadata()).scheduledClose)
     await (await pool.closeDraw()).wait()
-    await (await pool.continueSelection(12)).wait()
+    await (await pool.continueSelection(1, 12)).wait()
 
-    const claimClosesAt = await pool.drawClaimClosesAt(1)
-    await assert.rejects(pool.connect(alice).openNextDraw())
+    const claimClosesAt = (await pool.drawMetadata(1)).claimExpiresAt
+    assert.equal(await pool.actionableDrawCount(), 1n)
+    assert.deepEqual(Array.from(await pool.actionableDrawIds(0, 32)), [1n])
+    await assert.rejects(pool.actionableDrawIds(0, 33))
+    await assert.rejects(pool.connect(alice).sweepExpiredPrize(1))
     await advanceTo(claimClosesAt)
     await assert.rejects(pool.connect(alice).claimPrize(1))
-    await (await pool.connect(alice).openNextDraw()).wait()
-    assert.equal(await pool.drawId(), 2n)
-    assert.equal(await pool.drawClaimable(1), false)
+    await (await pool.connect(alice).sweepExpiredPrize(1)).wait()
+    const rolloverDrawId = await pool.currentDrawId()
+    assert.equal(rolloverDrawId > 1n, true)
+    assert.equal((await pool.drawMetadata(1)).status, 4n)
+    assert.equal(await pool.actionableDrawCount(), 1n)
+    assert.deepEqual(Array.from(await pool.actionableDrawIds(0, 32)), [2n])
 
     await deposit(pool, poolAddress, bob, 100_000_000n)
-    await advanceTo(await pool.drawClosesAt())
+    await advanceTo((await pool.currentDrawMetadata()).scheduledClose)
     await (await pool.closeDraw()).wait()
-    await (await pool.continueSelection(12)).wait()
-    const bobPrize = await previewAndDecryptPrize(pool, poolAddress, bob, 2)
+    await (await pool.continueSelection(rolloverDrawId, 12)).wait()
+    const bobPrize = await previewAndDecryptPrize(pool, poolAddress, bob, rolloverDrawId)
     assert.equal(bobPrize, 50_000_000n)
   })
 
@@ -159,14 +166,14 @@ describe("ConfidentialPrizePool", function () {
     await deposit(pool, poolAddress, bob, 100_000_000n)
     await withdraw(pool, poolAddress, bob, 100_000_000n)
     assert.equal(await pool.participantCount(), 2n)
-    assert.equal(await pool.isEntered(alice.address), true)
-    assert.equal(await pool.isEntered(bob.address), true)
+    assert.equal(await pool.isEnteredCurrent(alice.address), true)
+    assert.equal(await pool.isEnteredCurrent(bob.address), true)
 
     await rollToNextDraw(pool)
 
     assert.equal(await pool.participantCount(), 0n)
-    assert.equal(await pool.isEntered(alice.address), false)
-    assert.equal(await pool.isEntered(bob.address), false)
+    assert.equal(await pool.isEnteredCurrent(alice.address), false)
+    assert.equal(await pool.isEnteredCurrent(bob.address), false)
   })
 
   it("lets carried principal opt into repeated draws without another transfer", async function () {
@@ -180,13 +187,13 @@ describe("ConfidentialPrizePool", function () {
     assert.equal(await pool.participantCount(), 0n)
 
     await (await pool.connect(alice).enterDraw()).wait()
-    assert.equal(await pool.isEntered(alice.address), true)
+    assert.equal(await pool.isEnteredCurrent(alice.address), true)
     assert.equal(await pool.participantCount(), 1n)
 
-    await advanceTo(await pool.drawClosesAt())
+    await advanceTo((await pool.currentDrawMetadata()).scheduledClose)
     await (await pool.closeDraw()).wait()
-    await (await pool.continueSelection(12)).wait()
-    assert.equal(await pool.drawClaimable(2), true)
+    await (await pool.continueSelection(2, 12)).wait()
+    assert.equal((await pool.drawMetadata(2)).status, 2n)
   })
 
   it("bounds enrollment per draw and rejects the 257th distinct address", async function () {
@@ -254,11 +261,10 @@ async function advanceTo(timestamp) {
 }
 
 async function rollToNextDraw(pool) {
-  await advanceTo(await pool.drawClosesAt())
+  const drawId = await pool.currentDrawId()
+  await advanceTo((await pool.currentDrawMetadata()).scheduledClose)
   await (await pool.closeDraw()).wait()
-  await (await pool.continueSelection(12)).wait()
-  await advanceTo(await pool.drawClaimClosesAt(await pool.drawId()))
-  await (await pool.openNextDraw()).wait()
+  await (await pool.continueSelection(drawId, 12)).wait()
 }
 
 async function impersonatedSigners(count) {

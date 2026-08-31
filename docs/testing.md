@@ -8,7 +8,7 @@
 | `npm run build` | TypeScript build and Vite production build. |
 | `npm test` | Frontend unit tests. |
 | `npm run contracts:test` | Hardhat FHEVM contract tests. |
-| `npm run browser:smoke` | Browser smoke test for core UI rendering. |
+| `npm run browser:smoke` | Live-Sepolia browser smoke for both generated markets, FHE runtime initialization, private-session authorization, accessibility, and responsive layouts. |
 
 ## Current Coverage
 
@@ -21,9 +21,11 @@ Contract tests cover:
 - ACL persistence,
 - weighted selection,
 - zero-total draw behavior,
-- encrypted prize rollover,
+- encrypted expired-prize sweep,
 - Liquidity Hunt reward reserve funding,
 - prize pool funding from encrypted Earn TVL.
+
+The replacement cUSDT and cUSDC manifests passed the live browser smoke on 2026-08-31. Draw-1 principal and prize funding evidence is recorded under `contracts/deployments/live-cycle-*.json`; the remaining lifecycle transactions are time-gated by the immutable daily cutoffs.
 
 ## Manual Sepolia Test Plan
 
@@ -36,7 +38,7 @@ Use two wallets when possible.
 5. Repeat deposit with wallet B.
 6. Wait for the draw deadline.
 7. Call `closeDraw()`.
-8. Call `continueSelection()` until claimable.
+8. Confirm the next aligned draw is already open, then call `continueSelection(drawId, maxAccounts)` on the historical draw until claimable.
 9. Preview prize-or-zero from both wallets.
 10. Claim prize-or-zero.
 11. Withdraw principal.
@@ -53,6 +55,6 @@ Use two wallets when possible.
 
 - Invariant tests for encrypted prize conservation.
 - Fuzz tests around participant cap and repeated claims.
-- Withdrawal tests across each draw phase.
+- Withdrawal tests immediately before, at, and after the fixed cutoff.
 - Static analysis with Slither or equivalent.
 - Live Sepolia e2e recording with real Zama relayer calls.

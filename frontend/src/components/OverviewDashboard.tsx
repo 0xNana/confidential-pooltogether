@@ -3,10 +3,11 @@ import { useState } from "react"
 import type { ConfidentialPoolTogetherModel } from "../hooks/useConfidentialPoolTogether"
 import { PositionCard } from "./PositionCard"
 import { PrizeCard } from "./PrizeCard"
+import { HistoricalDraws } from "./HistoricalDraws"
 
 type OverviewDashboardProps = Pick<
   ConfidentialPoolTogetherModel,
-  "account" | "activeMarket" | "markets" | "selectMarket" | "correctChain" | "permitReady" | "principal" | "walletBalance" | "prize" | "poolState" | "isEntered" | "operation" | "connect" | "switchNetwork" | "authorizeReads" | "revealPosition" | "enterDraw" | "previewPrize" | "claimPrize"
+  "account" | "activeMarket" | "markets" | "selectMarket" | "correctChain" | "permitReady" | "principal" | "walletBalance" | "prize" | "prizeDrawId" | "poolState" | "isEntered" | "operation" | "connect" | "switchNetwork" | "authorizeReads" | "revealPosition" | "enterDraw" | "previewPrize" | "claimPrize" | "advanceSelection" | "sweepPrize" | "setHistoricalOffset"
 > & { onNavigate: (view: "deposit" | "withdraw") => void }
 
 type ChainFilter = "all" | "sepolia"
@@ -39,6 +40,8 @@ export function OverviewDashboard(props: OverviewDashboardProps) {
           <PrizeCard {...props} />
         </div>
       </section>
+
+      <HistoricalDraws {...props} />
 
       <section className="overview-catalog" aria-labelledby="vaults-title">
         <header className="overview-section-heading">

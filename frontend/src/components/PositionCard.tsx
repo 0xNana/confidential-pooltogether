@@ -41,13 +41,13 @@ export function PositionCard(props: PositionCardProps) {
           <div className="ledger-grid">
             <LedgerValue label="Your balance" value={props.principal === undefined ? undefined : `${formatTokenAmount(props.principal)} ${props.activeMarket.tokenSymbol}`} />
             <LedgerValue label="Wallet" value={props.walletBalance === undefined ? undefined : `${formatTokenAmount(props.walletBalance)} ${props.activeMarket.tokenSymbol}`} />
-            <div className="ledger-value ledger-private"><span><LockKeyhole size={12} /> Draw entry</span><strong>{entryState === undefined ? "—" : entryState ? "Entered" : "Not entered"}</strong><small>Draw #{props.poolState.drawId || "—"}</small></div>
+            <div className="ledger-value ledger-private"><span><LockKeyhole size={12} /> Draw entry</span><strong>{entryState === undefined ? "—" : entryState ? "Entered" : "Not entered"}</strong><small>Draw #{props.poolState.currentDraw.drawId || "—"}</small></div>
           </div>
 
-          {props.activeMarket.drawScopedEnrollment && props.poolState.phase === 0 && props.isEntered === false && (
+          {props.activeMarket.drawScopedEnrollment && props.poolState.currentDraw.status === 0 && props.isEntered === false && (
             <div className="permit-callout authorized">
               <TicketCheck size={19} />
-              <div><strong>Entry open for draw #{props.poolState.drawId}</strong><p>Your existing confidential principal stays in place.</p></div>
+              <div><strong>Entry open for draw #{props.poolState.currentDraw.drawId}</strong><p>Your existing confidential principal stays in place.</p></div>
               <button className="button button-accent" type="button" onClick={() => void props.enterDraw()} disabled={entering} data-testid="enter-draw">
                 <TicketCheck size={15} /> {entering ? "Check wallet…" : "Enter draw"}
               </button>

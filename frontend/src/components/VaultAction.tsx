@@ -6,7 +6,7 @@ import { formatTokenAmount } from "../lib/fhevm"
 
 type VaultActionProps = Pick<
   ConfidentialPoolTogetherModel,
-  "account" | "activeMarket" | "correctChain" | "isOperator" | "walletBalance" | "principal" | "poolState" | "operation" | "approveOperator" | "transact"
+  "account" | "activeMarket" | "correctChain" | "isOperator" | "walletBalance" | "principal" | "operation" | "approveOperator" | "transact"
 >
 
 type Mode = "deposit" | "withdraw"
@@ -21,10 +21,9 @@ export function VaultAction({ mode, ...props }: VaultActionProps & { mode: Mode 
   const disabledReason = useMemo(() => {
     if (!props.account) return "Connect wallet"
     if (!props.correctChain) return "Switch to Sepolia"
-    if (mode === "deposit" && props.poolState.phase !== 0) return "Deposits paused during draw close"
     if (mode === "deposit" && !props.isOperator) return "Approve pool access first"
     return validateActionAmount(mode, amount, available)
-  }, [amount, available, mode, props.account, props.correctChain, props.isOperator, props.poolState.phase])
+  }, [amount, available, mode, props.account, props.correctChain, props.isOperator])
 
   async function submit(event: FormEvent) {
     event.preventDefault()

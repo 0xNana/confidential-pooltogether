@@ -5,6 +5,7 @@ const { createInstance, SepoliaConfig } = require("@zama-fhe/relayer-sdk/node")
 const { TOKENS } = require("./token-config.cjs")
 const { eventsNamed, readContractEvents } = require("./event-evidence.cjs")
 const { incompleteTasks, nextExecutableTask, unrecoverableReason, nonzeroClaimRisk } = require("./live-cycle-plan.cjs")
+const { retryOperation } = require("./retry-operation.cjs")
 
 const CHAIN_ID = 11155111
 const EXECUTE = process.env.LIVE_CYCLE_EXECUTE === "1"
@@ -108,7 +109,7 @@ async function runMarket(symbol, provider, signer) {
       execute: EXECUTE,
       drawId: state.currentDrawId,
       targetDrawId: state.targetDrawId,
-      phase: state.phase,
+      targetStatus: state.targetStatus,
       participantCount: state.participantCount,
       incompleteTasks: tasks,
     }, null, 2))
@@ -148,13 +149,13 @@ async function executeTask(context) {
   const { taskId, state, pool, underlying, wrapper, token, provider, signer, submitted } = context
   if (taskId === "deposit") {
     await acquireConfidentialFunds({ amount: POOL_PRINCIPAL, operator: await pool.getAddress(), underlying, wrapper, token, provider, signer, submitted })
-    const encrypted = await encrypt64(await getFhevm(), await pool.getAddress(), signer.address, POOL_PRINCIPAL)
+    const encrypted = await encrypt64(await pool.getAddress(), signer.address, POOL_PRINCIPAL)
     submitted.push(await send("pool-deposit", pool.deposit(encrypted.handle, encrypted.proof), provider))
     return
   }
   if (taskId === "fund-prize") {
     await acquireConfidentialFunds({ amount: DIRECT_PRIZE, operator: await pool.getAddress(), underlying, wrapper, token, provider, signer, submitted })
-    const encrypted = await encrypt64(await getFhevm(), await pool.getAddress(), signer.address, DIRECT_PRIZE)
+    const encrypted = await encrypt64(await pool.getAddress(), signer.address, DIRECT_PRIZE)
     submitted.push(await send("direct-prize-funding", pool.fundPrize(encrypted.handle, encrypted.proof), provider))
     return
   }
@@ -164,7 +165,7 @@ async function executeTask(context) {
   }
   if (taskId === "select-winner") {
     const maxBatch = await pool.MAX_SCAN_BATCH()
-    submitted.push(await send("continue-selection", pool.continueSelection(maxBatch), provider))
+    submitted.push(await send("continue-selection", pool.continueSelection(state.targetDrawId, maxBatch), provider))
     return
   }
   if (taskId === "claim-prize") {
@@ -173,12 +174,12 @@ async function executeTask(context) {
     return
   }
   if (taskId === "withdraw-principal") {
-    const encrypted = await encrypt64(await getFhevm(), await pool.getAddress(), signer.address, POOL_PRINCIPAL)
+    const encrypted = await encrypt64(await pool.getAddress(), signer.address, POOL_PRINCIPAL)
     submitted.push(await send("withdraw-principal", pool.withdraw(encrypted.handle, encrypted.proof), provider))
     return
   }
-  if (taskId === "open-next-draw") {
-    submitted.push(await send("open-next-draw", pool.openNextDraw(), provider))
+  if (taskId === "sweep-prize") {
+    submitted.push(await send("sweep-prize", pool.sweepExpiredPrize(state.targetDrawId), provider))
     return
   }
   throw new Error(`Unknown live-cycle task ${taskId}`)
@@ -204,36 +205,28 @@ async function readState(context) {
   const latestBlockData = await withTimeout(provider.getBlock(latestBlock), 15_000, "latest block data")
   if (!latestBlockData) throw new Error("Latest Sepolia block is unavailable")
   const startBlock = poolDeployment.deploymentBlock ?? Math.max(0, latestBlock - 50_000)
-  const [contractState, events] = await Promise.all([
-    withTimeout(Promise.all([
-      pool.drawId(),
-      pool.phase(),
-      pool.drawClosesAt(),
-      pool.participantCount(),
-    ]), 20_000, "pool state reads"),
+  const [currentDrawIdValue, events] = await Promise.all([
+    withTimeout(pool.currentDrawId(), 20_000, "current draw ID"),
     readContractEvents(pool, startBlock, latestBlock),
   ])
-  const [currentDrawIdValue, phaseValue, drawClosesAtValue, participantCountValue] = contractState
   const currentDrawId = Number(currentDrawIdValue)
   const deposits = eventsNamed(events, "DepositRecorded").filter((event) => sameAddress(event.args.account, participantAddress))
   const targetDrawId = deposits.length > 0 ? Number(deposits[0].args.drawId) : currentDrawId
+  const targetMetadata = await withTimeout(pool.drawMetadata(targetDrawId), 15_000, "target draw metadata")
   const drawEvents = (name) => eventsNamed(events, name).filter((event) => eventDrawId(event) === targetDrawId)
-  const claimClosesAt = Number(await withTimeout(pool.drawClaimClosesAt(targetDrawId), 15_000, "claim deadline"))
-  const nextDraws = eventsNamed(events, "DrawOpened").filter((event) => Number(event.args.drawId) > targetDrawId)
 
   return {
-    phase: Number(phaseValue),
+    targetStatus: Number(targetMetadata.status),
     currentDrawId,
     targetDrawId,
     now: latestBlockData.timestamp,
-    drawClosesAt: Number(drawClosesAtValue),
-    claimClosesAt,
-    participantCount: Number(participantCountValue),
+    scheduledClose: Number(targetMetadata.scheduledClose),
+    claimExpiresAt: Number(targetMetadata.claimExpiresAt),
+    participantCount: Number(targetMetadata.participantCount),
     hasDeposit: deposits.length > 0,
     hasPrizeFunding: drawEvents("PrizeFunded").length > 0,
     hasClaim: drawEvents("PrizeClaimAttempted").some((event) => sameAddress(event.args.account, participantAddress)),
     hasWithdrawal: drawEvents("WithdrawalRecorded").some((event) => sameAddress(event.args.account, participantAddress)),
-    hasNextDraw: nextDraws.length > 0,
     events,
   }
 }
@@ -299,11 +292,25 @@ async function createPublicFheInstance() {
   throw new Error(`No public Sepolia RPC initialized the FHE client: ${messageOf(lastError)}`)
 }
 
-async function encrypt64(fhevm, contractAddress, userAddress, amount) {
-  const input = fhevm.createEncryptedInput(contractAddress, userAddress)
-  input.add64(amount)
-  const encrypted = await input.encrypt()
-  return { handle: encrypted.handles[0], proof: encrypted.inputProof }
+async function encrypt64(contractAddress, userAddress, amount) {
+  return retryOperation(async () => {
+    const fhevm = await getFhevm()
+    const input = fhevm.createEncryptedInput(contractAddress, userAddress)
+    input.add64(amount)
+    const encrypted = await withTimeout(input.encrypt(), 60_000, "FHE input proof")
+    return { handle: encrypted.handles[0], proof: encrypted.inputProof }
+  }, {
+    attempts: 4,
+    onRetry: async (error, attempt) => {
+      fhevmPromise = undefined
+      console.error(JSON.stringify({
+        stage: "encrypt-input-retry",
+        attempt,
+        error: messageOf(error),
+      }))
+    },
+    delay: async (attempt) => sleep(attempt * 3_000),
+  })
 }
 
 async function send(label, transactionPromise, provider) {
@@ -351,15 +358,15 @@ async function writeEvidence(context) {
     },
     state: {
       currentDrawId: state.currentDrawId,
-      phase: state.phase,
+      targetStatus: state.targetStatus,
       participantCount: state.participantCount,
-      drawClosesAt: isoOrNull(state.drawClosesAt),
-      claimClosesAt: isoOrNull(state.claimClosesAt),
+      scheduledClose: isoOrNull(state.scheduledClose),
+      claimExpiresAt: isoOrNull(state.claimExpiresAt),
       hasDeposit: state.hasDeposit,
       hasPrizeFunding: state.hasPrizeFunding,
       hasClaim: state.hasClaim,
       hasWithdrawal: state.hasWithdrawal,
-      hasNextDraw: state.hasNextDraw,
+      historicalOverlap: state.currentDrawId > state.targetDrawId,
     },
     incompleteTasks: tasks,
     submitted,
@@ -383,7 +390,7 @@ function loadDeployment(filename) {
 }
 
 function eventDrawId(event) {
-  const value = event.args.drawId ?? event.args.toDrawId ?? event.args.fromDrawId
+  const value = event.args.drawId ?? event.args.targetDrawId ?? event.args.sourceDrawId
   return value === undefined ? null : Number(value)
 }
 

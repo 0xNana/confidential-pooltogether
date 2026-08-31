@@ -2,15 +2,16 @@ export const MAX_SCAN_BATCH = 12
 
 export type DrawLifecycleState = {
   drawId: number
-  phase: number
-  drawClosesAt: number
-  claimClosesAt: number
+  status: number
+  scheduledClose: number
+  claimExpiresAt: number
   participantCount: number
   scanCursor: number
 }
 
 export type DrawLifecycleAction = {
-  kind: "close" | "continue" | "open-next"
+  kind: "close" | "continue" | "sweep" | "none"
+  drawId?: number
   label: string
   ready: boolean
   reason: string
@@ -21,14 +22,33 @@ export type DrawLifecycleAction = {
   total?: number
 }
 
-export function deriveDrawLifecycle(state: DrawLifecycleState, now: number): DrawLifecycleAction {
-  if (state.phase === 1) {
-    const total = Math.max(0, state.participantCount)
-    const completed = Math.min(Math.max(0, state.scanCursor), total)
+export function deriveDrawLifecycle(
+  currentDraw: DrawLifecycleState,
+  historicalDraws: DrawLifecycleState[],
+  now: number,
+): DrawLifecycleAction {
+  if (currentDraw.status === 0 && currentDraw.scheduledClose > 0 && now >= currentDraw.scheduledClose) {
+    return {
+      kind: "close",
+      drawId: currentDraw.drawId,
+      label: "Finalize entry draw",
+      ready: true,
+      reason: "Freeze this period and open the currently aligned entry draw.",
+      availableAt: currentDraw.scheduledClose,
+    }
+  }
+
+  const selecting = [...historicalDraws]
+    .filter((draw) => draw.status === 1)
+    .sort((a, b) => a.drawId - b.drawId)[0]
+  if (selecting) {
+    const total = Math.max(0, selecting.participantCount)
+    const completed = Math.min(Math.max(0, selecting.scanCursor), total)
     const remaining = Math.max(0, total - completed)
     return {
       kind: "continue",
-      label: "Continue selection",
+      drawId: selecting.drawId,
+      label: `Continue draw #${selecting.drawId}`,
       ready: remaining > 0,
       reason: remaining > 0
         ? `Process ${Math.min(MAX_SCAN_BATCH, remaining)} of ${remaining} remaining accounts.`
@@ -40,28 +60,30 @@ export function deriveDrawLifecycle(state: DrawLifecycleState, now: number): Dra
     }
   }
 
-  if (state.phase === 2) {
-    const ready = state.claimClosesAt > 0 && now >= state.claimClosesAt
+  const expired = [...historicalDraws]
+    .filter((draw) => draw.status === 3 || (draw.status === 2 && draw.claimExpiresAt > 0 && now >= draw.claimExpiresAt))
+    .sort((a, b) => a.drawId - b.drawId)[0]
+  if (expired) {
     return {
-      kind: "open-next",
-      label: "Open next draw",
-      ready,
-      reason: ready ? "Roll any unclaimed prize forward and open the next draw." : "The claim window is still open.",
-      availableAt: state.claimClosesAt || undefined,
+      kind: "sweep",
+      drawId: expired.drawId,
+      label: `Sweep draw #${expired.drawId}`,
+      ready: true,
+      reason: "Move its encrypted remainder into the current open draw.",
+      availableAt: expired.claimExpiresAt,
     }
   }
 
-  const deadlineReached = state.drawClosesAt > 0 && now >= state.drawClosesAt
-  const hasParticipants = state.participantCount > 0
+  const nextClaimExpiry = historicalDraws
+    .filter((draw) => draw.status === 2 && draw.claimExpiresAt > now)
+    .reduce<number | undefined>((soonest, draw) => soonest === undefined ? draw.claimExpiresAt : Math.min(soonest, draw.claimExpiresAt), undefined)
   return {
-    kind: "close",
-    label: "Close draw",
-    ready: deadlineReached && hasParticipants,
-    reason: !hasParticipants
-      ? "A deposit is required before this draw can close."
-      : deadlineReached
-        ? "Freeze encrypted balances and start winner selection."
-        : "The draw is still accepting deposits.",
-    availableAt: state.drawClosesAt || undefined,
+    kind: "none",
+    label: "Draws are progressing",
+    ready: false,
+    reason: currentDraw.scheduledClose > now
+      ? "The current draw is accepting entries; historical claims remain independent."
+      : "Refresh to discover the next permissionless action.",
+    availableAt: (nextClaimExpiry ?? currentDraw.scheduledClose) || undefined,
   }
 }
