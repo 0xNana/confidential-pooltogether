@@ -201,6 +201,11 @@ if (!hasAccessibleNode(appAccessibility, "button", "Overview") || !hasAccessible
 if (await page.$('[data-testid="live-draw"]')) {
   throw new Error("Live draw strip is still rendered on Overview")
 }
+await page.waitForSelector('[data-testid="overview-next-draw"]')
+const nextDrawText = await page.$eval('[data-testid="overview-next-draw"]', (element) => element.textContent ?? "")
+if (!nextDrawText.includes("Next draw") || !nextDrawText.includes("Prize pool")) {
+  throw new Error("Overview is missing next draw information")
+}
 if (await page.$('[data-testid="enter-draw"]')) {
   await page.click('[data-testid="enter-draw"]')
   await page.waitForFunction(() => document.querySelector('[data-testid="shell-deposit"]')?.getAttribute("aria-current") === "page")

@@ -84,7 +84,7 @@ function LedgerValue({ label, value }: { label: string; value?: string }) {
     <div className="ledger-value">
       <span><LockKeyhole size={12} /> {label}</span>
       {value ? <strong>{value}</strong> : <span className="cipher-line" aria-label={`${label} sealed`}><i /><i /><i /><i /><i /></span>}
-      <small>{value ? "Visible only in this session" : "FHE ciphertext"}</small>
+      <small>{value ? "Visible only to you" : "FHE ciphertext"}</small>
     </div>
   )
 }

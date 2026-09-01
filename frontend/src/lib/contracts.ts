@@ -58,6 +58,7 @@ export const MARKETS: Record<MarketId, MarketConfig> = {
 export const CHAIN_ID = deployment.chainId
 export const CHAIN_HEX = `0x${CHAIN_ID.toString(16)}`
 export const DEFAULT_MARKET = MARKETS.cUSDT
+export const DEPLOYER = deployment.deployer as Address
 export const POOL_ADDRESS = DEFAULT_MARKET.poolAddress
 export const LIQUIDITY_VAULT_ADDRESS = DEFAULT_MARKET.liquidityVaultAddress
 export const LIQUIDITY_VAULT_DEPLOYER = DEFAULT_MARKET.liquidityVaultDeployer
@@ -102,6 +103,7 @@ export const POOL_ABI = [
   "function actionableDrawIds(uint256,uint256) view returns (uint64[])",
   "function principalOf(address) view returns (bytes32)",
   "function prizePreviewOf(uint64,address) view returns (bytes32)",
+  "function fundPrize(bytes32,bytes)",
   "function setRewardSource(address)",
   "function preparePrizeCapacity() returns (bytes32)",
   "function receivePrizeFromSource(bytes32)",

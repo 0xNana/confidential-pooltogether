@@ -29,7 +29,7 @@ export function buildConfidentialAction(input: {
 }
 
 export function parseTokenAmount(value: string) {
-  const normalized = value.trim()
+  const normalized = value.trim().replaceAll(",", "")
   if (!normalized) throw new RangeError("Enter an amount.")
   const amount = parseUnits(normalized, TOKEN_DECIMALS)
   if (amount <= 0n) throw new RangeError("Amount must be greater than zero.")

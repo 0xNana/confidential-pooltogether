@@ -59,7 +59,6 @@ export function LandingPage() {
             </div>
 
             <div className="hero-product" role="group" aria-label="How a confidential prize draw protects your position">
-              <div className="hero-product-orbit" aria-hidden="true" />
               <header className="hero-product-header">
                 <span><BrandMark /><strong>Private draw console</strong></span>
                 <small><i /> Sepolia live</small>
@@ -87,6 +86,9 @@ export function LandingPage() {
               </ol>
               <div className="hero-product-foot"><ScanLine size={15} /><span><strong>Public execution. Private values.</strong><small>Powered by Zama FHEVM</small></span></div>
             </div>
+          </div>
+          <div className="landing-hero-ticker" aria-hidden="true">
+            <div><span>Private by default</span><i /> <span>Verifiable onchain</span><i /> <span>Principal stays yours</span><i /> <span>Powered by Zama FHEVM</span><i /> <span>Private by default</span><i /> <span>Verifiable onchain</span><i /> <span>Principal stays yours</span><i /> <span>Powered by Zama FHEVM</span></div>
           </div>
           <div className="landing-hero-proof" aria-label="Protocol assurances">
             <span><WalletCards size={16} /><strong>Principal stays yours</strong><small>Withdraw while the pool is open</small></span>

@@ -73,6 +73,7 @@ export default function VaultApp() {
         <main className="vault-main" data-workflow-step={model.workflowStep}>
           {model.readError && <div className="read-error" role="alert"><strong>Sepolia read degraded.</strong><span>{model.readError}</span><button type="button" onClick={() => void model.refresh()}>Retry</button></div>}
 
+          <div key={activeView} className="view-transition">
           {activeView !== "overview" && activeView !== "draws" && activeView !== "deposit" && (
             <div className="workspace-heading">
               <div>
@@ -120,6 +121,7 @@ export default function VaultApp() {
               <ActivityFeed activity={model.activity} loading={model.loading} />
             </section>
           )}
+          </div>
         </main>
       </div>
 
@@ -132,7 +134,7 @@ export default function VaultApp() {
       </footer>
 
       <ProofDrawer open={proofOpen} onClose={() => setProofOpen(false)} poolState={model.poolState} market={model.activeMarket} />
-      <OperationToast operation={model.operation} onClose={model.clearOperation} />
+      <OperationToast operation={model.operation} onClose={model.clearOperation} onViewDraw={() => { model.clearOperation(); setActiveView("draws") }} />
     </div>
   )
 }

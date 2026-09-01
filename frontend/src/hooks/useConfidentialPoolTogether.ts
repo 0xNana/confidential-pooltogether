@@ -68,6 +68,7 @@ export type OperationState = {
   kind?: "deposit" | "withdraw" | "operator" | "preview" | "claim" | "permit" | "fund" | "lifecycle" | "entry"
   stage: OperationStage
   title?: string
+  detail?: string
   hash?: string
   error?: string
 }
@@ -495,7 +496,7 @@ export function useConfidentialPoolTogether() {
       setPrincipal(undefined)
       setWalletBalance(undefined)
       setPrize(undefined)
-      setOperation({ kind, stage: "confirmed", title: `Encrypted ${kind === "deposit" ? "deposit" : "withdrawal"} confirmed`, hash: tx.hash })
+      setOperation({ kind, stage: "confirmed", title: kind === "deposit" ? "You’re in 🎉" : "Encrypted withdrawal confirmed", detail: kind === "deposit" ? `Deposit confirmed. You’re entered in Draw #${poolState.currentDraw.drawId}. Your principal stays private.` : undefined, hash: tx.hash })
       await refresh(true)
     } catch (error) {
       setOperation({ kind, stage: "error", error: toUserError(error, `${kind === "deposit" ? "Deposit" : "Withdrawal"} failed.`) })

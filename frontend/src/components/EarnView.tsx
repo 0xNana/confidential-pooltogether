@@ -5,8 +5,9 @@ import { useEncrypt } from "@zama-fhe/react-sdk"
 import type { ConfidentialPoolTogetherModel } from "../hooks/useConfidentialPoolTogether"
 import { ASSET_ABI, LIQUIDITY_VAULT_ABI } from "../lib/contracts"
 import { formatTokenAmount, parseTokenAmount } from "../lib/fhevm"
+import { AdminPrizeFunding } from "./AdminPrizeFunding"
 
-type EarnViewProps = Pick<ConfidentialPoolTogetherModel, "account" | "activeMarket" | "correctChain" | "walletBalance" | "vaultTvl" | "browserProvider" | "connect" | "switchNetwork">
+type EarnViewProps = Pick<ConfidentialPoolTogetherModel, "account" | "activeMarket" | "markets" | "selectMarket" | "correctChain" | "walletBalance" | "vaultTvl" | "browserProvider" | "connect" | "switchNetwork">
 
 export function EarnView(props: EarnViewProps) {
   const { mutateAsync: encrypt } = useEncrypt()
@@ -75,6 +76,7 @@ export function EarnView(props: EarnViewProps) {
         <span className="security-badge"><LockKeyhole size={13} /> Confidential strategy</span>
       </header>
       <div className="earn-intro"><ChartNoAxesCombined size={23} /><div><strong>{hasRewardSource ? "Simulated 12% annual target feeds prize liquidity." : "Reward-source vault is ready for activation."}</strong><p>{hasRewardSource ? "Earn keeps principal encrypted and accrues a time-weighted test reward that can be paid only from a separately funded reserve." : "The deployed app must show a time-weighted reward simulator and pool wiring before claiming live prize funding."}</p></div></div>
+      <AdminPrizeFunding {...props} />
       <div className="earn-metrics"><div><small>APY</small><strong>12%</strong><span>{hasRewardSource ? "Simulated target" : "Not live yet"}</span></div><div><small>TVL</small><strong>{props.vaultTvl === undefined ? "Encrypted" : `${formatTokenAmount(props.vaultTvl)} ${props.activeMarket.tokenSymbol}`}</strong><span>Vault principal</span></div><div><small>Principal at risk</small><strong>None</strong><span>{hasRewardSource ? "Reward reserve separate" : "Principal-only live"}</span></div><div><small>Strategy status</small><strong>{hasRewardSource ? "Reserve simulator" : "Pending"}</strong><span>{hasRewardSource ? "No realized yield" : "Verify deployment"}</span></div></div>
       <form className="earn-deposit" onSubmit={(event) => void submit(event)}>
         <div className="earn-deposit-heading"><div><p className="eyebrow">Liquidity Hunt vault</p><h3>Deposit {props.activeMarket.tokenSymbol}</h3><p>{hasRewardSource ? "Deposits define encrypted Earn TVL. The reward source funds prize liquidity from a separate reserve." : "This deployed vault should be treated as principal-only until reward-source verification passes."}</p></div><span className="earn-vault-status"><Check size={14} /> Vault live</span></div>

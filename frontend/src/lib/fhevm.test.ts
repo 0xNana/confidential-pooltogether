@@ -22,6 +22,7 @@ describe("FHEVM integration boundary", () => {
 
   it("parses cUSDT using the ERC-7984 token's six decimals", () => {
     expect(parseTokenAmount("12.345678")).toBe(12_345_678n)
+    expect(parseTokenAmount("2,002,029")).toBe(2_002_029_000_000n)
     expect(formatTokenAmount(12_345_678n, 6)).toBe("12.345678")
     expect(() => parseTokenAmount("0")).toThrow("greater than zero")
     expect(() => parseTokenAmount("1.0000001")).toThrow()

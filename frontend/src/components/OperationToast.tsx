@@ -4,7 +4,7 @@ import type { OperationState } from "../hooks/useConfidentialPoolTogether"
 
 const CONFIRMED_TOAST_DURATION_MS = 4_000
 
-export function OperationToast({ operation, onClose }: { operation: OperationState; onClose: () => void }) {
+export function OperationToast({ operation, onClose, onViewDraw }: { operation: OperationState; onClose: () => void; onViewDraw?: () => void }) {
   useEffect(() => {
     if (operation.stage !== "confirmed") return
     const timeout = window.setTimeout(onClose, CONFIRMED_TOAST_DURATION_MS)
@@ -21,7 +21,9 @@ export function OperationToast({ operation, onClose }: { operation: OperationSta
       <div>
         <small>{stageLabel(operation.stage)}</small>
         <strong>{operation.error ?? operation.title ?? "Working"}</strong>
+        {operation.detail && <p className="operation-toast-detail">{operation.detail}</p>}
         {operation.hash && <a href={`https://sepolia.etherscan.io/tx/${operation.hash}`} target="_blank" rel="noreferrer">View transaction <ExternalLink size={12} /></a>}
+        {operation.kind === "deposit" && operation.stage === "confirmed" && onViewDraw && <button className="operation-toast-action" type="button" onClick={onViewDraw}>View draw <ExternalLink size={12} /></button>}
       </div>
       {!busy && <button type="button" onClick={onClose} aria-label="Dismiss"><X size={16} /></button>}
     </div>
