@@ -22,9 +22,7 @@ export function DrawStatus(props: DrawStatusProps) {
   const scheduleValue = formatCountdown(currentDraw.scheduledClose - now)
   const lifecycle = deriveDrawLifecycle(currentDraw, poolState.historicalDraws, now)
   const lifecycleBusy = props.operation.kind === "lifecycle" && ["signature", "pending"].includes(props.operation.stage)
-  const actionLabel = !lifecycle.ready
-    ? lifecycle.label
-    : !props.account
+  const actionLabel = !props.account
       ? "Connect wallet"
       : !props.correctChain
         ? "Switch to Sepolia"
@@ -49,7 +47,7 @@ export function DrawStatus(props: DrawStatusProps) {
       <div className="draw-console-metric snapshot"><LockKeyhole size={17} /><span><small>Prize pool</small><strong>Encrypted</strong></span></div>
       <div className={`claim-status ${poolState.claimDraw ? "ready" : "waiting"}`}><CheckCircle2 size={16} /><span>{poolState.claimDraw ? `Draw #${poolState.claimDraw.drawId} claims open` : "No private claim ready"}</span></div>
       <div className="lifecycle-control">
-        <span className="lifecycle-icon">{lifecycle.kind === "continue" ? <ScanLine size={18} /> : lifecycleBusy ? <LoaderCircle className="spin" size={18} /> : <Wallet size={18} />}</span>
+        <span className="lifecycle-icon">{lifecycle.kind === "continue" ? <ScanLine size={18} /> : lifecycleBusy ? <LoaderCircle className="spin" size={18} /> : lifecycle.ready ? <Wallet size={18} /> : <CheckCircle2 size={18} />}</span>
         <div className="lifecycle-copy">
           <small>Permissionless draw action</small>
           <strong>{lifecycle.label}</strong>
@@ -61,9 +59,13 @@ export function DrawStatus(props: DrawStatusProps) {
             </div>
           )}
         </div>
-        <button className="button button-ink" type="button" onClick={() => void action()} disabled={props.loading || !lifecycle.ready || lifecycleBusy} data-testid="draw-lifecycle-action">
-          {lifecycleBusy && <LoaderCircle className="spin" size={15} />}{actionLabel}
-        </button>
+        {lifecycle.ready ? (
+          <button className="button button-ink" type="button" onClick={() => void action()} disabled={props.loading || !lifecycle.ready || lifecycleBusy} data-testid="draw-lifecycle-action">
+            {lifecycleBusy && <LoaderCircle className="spin" size={15} />}{actionLabel}
+          </button>
+        ) : (
+          <span className="lifecycle-passive"><CheckCircle2 size={15} /> No action needed</span>
+        )}
       </div>
     </section>
   )

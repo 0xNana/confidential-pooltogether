@@ -5,9 +5,9 @@ import type { ConfidentialPoolTogetherModel } from "../hooks/useConfidentialPool
 import { type Address } from "../lib/contracts"
 import { parseTokenAmount } from "../lib/fhevm"
 
-type SendActionProps = Pick<ConfidentialPoolTogetherModel, "account" | "activeMarket" | "correctChain">
+type SendActionProps = Pick<ConfidentialPoolTogetherModel, "account" | "activeMarket" | "markets" | "selectMarket" | "correctChain">
 
-export function SendAction({ account, activeMarket, correctChain }: SendActionProps) {
+export function SendAction({ account, activeMarket, markets, selectMarket, correctChain }: SendActionProps) {
   const [recipient, setRecipient] = useState("")
   const [amount, setAmount] = useState("")
   const [error, setError] = useState<string>()
@@ -34,6 +34,7 @@ export function SendAction({ account, activeMarket, correctChain }: SendActionPr
       <div className="token-action-mark"><span><Send size={22} /></span></div>
       <form onSubmit={(event) => void submit(event)}>
         <div className="action-heading"><div><p className="eyebrow">Private transfer</p><h2 id="send-action-title">Send {activeMarket.tokenSymbol}</h2></div></div>
+        <div className="token-market-switch" aria-label="Choose token"><label htmlFor="send-market-select">Token</label><select id="send-market-select" value={activeMarket.id} onChange={(event) => selectMarket(event.target.value as keyof typeof markets)} disabled={transfer.isPending} data-testid="send-market-select">{Object.values(markets).map((market) => <option key={market.id} value={market.id}>{market.tokenSymbol}</option>)}</select></div>
         <p className="token-action-copy">Send confidential {activeMarket.tokenSymbol} to another wallet without publishing the transfer amount.</p>
         {!account ? (
           <div className="token-action-gate"><Wallet size={18} /> Connect a wallet to continue.</div>

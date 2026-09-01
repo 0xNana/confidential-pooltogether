@@ -4,8 +4,8 @@ import { formatTokenAmount } from "../lib/fhevm"
 
 type PositionCardProps = Pick<
   ConfidentialPoolTogetherModel,
-  "account" | "activeMarket" | "correctChain" | "permitReady" | "principal" | "walletBalance" | "poolState" | "isEntered" | "operation" | "connect" | "switchNetwork" | "authorizeReads" | "revealPosition" | "enterDraw"
->
+  "account" | "activeMarket" | "correctChain" | "permitReady" | "principal" | "walletBalance" | "poolState" | "isEntered" | "operation" | "connect" | "switchNetwork" | "authorizeReads" | "revealPosition"
+> & { onNavigate: (view: "deposit") => void }
 
 export function PositionCard(props: PositionCardProps) {
   const decrypting = props.operation.stage === "preparing" && props.operation.title?.includes("decryption")
@@ -48,8 +48,8 @@ export function PositionCard(props: PositionCardProps) {
             <div className="permit-callout authorized">
               <TicketCheck size={19} />
               <div><strong>Entry open for draw #{props.poolState.currentDraw.drawId}</strong><p>Your existing confidential principal stays in place.</p></div>
-              <button className="button button-accent" type="button" onClick={() => void props.enterDraw()} disabled={entering} data-testid="enter-draw">
-                <TicketCheck size={15} /> {entering ? "Check wallet…" : "Enter draw"}
+              <button className="button button-accent" type="button" onClick={() => props.onNavigate("deposit")} disabled={entering} data-testid="enter-draw">
+                <TicketCheck size={15} /> Choose a vault
               </button>
             </div>
           )}
@@ -71,7 +71,7 @@ export function PositionCard(props: PositionCardProps) {
               </button>
             </div>
           ) : (
-            <div className="local-reveal-note"><ShieldCheck size={14} /> Values decrypted locally through the Zama KMS threshold network.</div>
+            <div className="local-reveal-note"><ShieldCheck size={14} /> Values decrypted locally</div>
           )}
         </>
       )}

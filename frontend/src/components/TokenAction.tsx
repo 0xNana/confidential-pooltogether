@@ -4,11 +4,11 @@ import { useShield, useUnshield } from "@zama-fhe/react-sdk"
 import type { ConfidentialPoolTogetherModel } from "../hooks/useConfidentialPoolTogether"
 import { formatTokenAmount, parseTokenAmount } from "../lib/fhevm"
 
-type TokenActionProps = Pick<ConfidentialPoolTogetherModel, "account" | "activeMarket" | "correctChain" | "walletBalance" | "underlyingBalance" | "permitReady" | "operation" | "authorizeReads" | "revealPosition"> & {
+type TokenActionProps = Pick<ConfidentialPoolTogetherModel, "account" | "activeMarket" | "markets" | "selectMarket" | "correctChain" | "walletBalance" | "underlyingBalance" | "permitReady" | "operation" | "authorizeReads" | "revealPosition"> & {
   mode: "shield" | "unshield"
 }
 
-export function TokenAction({ account, activeMarket, correctChain, mode, walletBalance, underlyingBalance, permitReady, operation, authorizeReads, revealPosition }: TokenActionProps) {
+export function TokenAction({ account, activeMarket, markets, selectMarket, correctChain, mode, walletBalance, underlyingBalance, permitReady, operation, authorizeReads, revealPosition }: TokenActionProps) {
   const [amount, setAmount] = useState("")
   const [error, setError] = useState<string>()
   const shield = useShield({ address: activeMarket.assetAddress })
@@ -40,6 +40,12 @@ export function TokenAction({ account, activeMarket, correctChain, mode, walletB
       <form onSubmit={(event) => void submit(event)}>
         <div className="action-heading">
           <div><p className="eyebrow">{isShield ? "Public to private" : "Private to public"}</p><h2 id="token-action-title">{isShield ? `Shield ${activeMarket.tokenSymbol}` : `Unshield ${activeMarket.tokenSymbol}`}</h2></div>
+        </div>
+        <div className="token-market-switch" aria-label="Choose token">
+          <label htmlFor={`${mode}-market-select`}>Token</label>
+          <select id={`${mode}-market-select`} value={activeMarket.id} onChange={(event) => selectMarket(event.target.value as keyof typeof markets)} disabled={busy} data-testid={`${mode}-market-select`}>
+            {Object.values(markets).map((market) => <option key={market.id} value={market.id}>{market.tokenSymbol}</option>)}
+          </select>
         </div>
         <p className="token-action-copy">{isShield ? `Convert public test ${activeMarket.underlyingSymbol} into confidential ${activeMarket.tokenSymbol} before entering the prize pool.` : `Convert confidential ${activeMarket.tokenSymbol} back into public test ${activeMarket.underlyingSymbol}. The wrapper completes the encrypted unwrap flow.`}</p>
         <div className="token-route" aria-label={isShield ? `Public ${activeMarket.underlyingSymbol} to confidential ${activeMarket.tokenSymbol}` : `Confidential ${activeMarket.tokenSymbol} to public ${activeMarket.underlyingSymbol}`}>

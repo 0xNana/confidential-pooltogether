@@ -1,7 +1,16 @@
+import { useEffect } from "react"
 import { AlertTriangle, Check, ExternalLink, LoaderCircle, X } from "lucide-react"
 import type { OperationState } from "../hooks/useConfidentialPoolTogether"
 
+const CONFIRMED_TOAST_DURATION_MS = 4_000
+
 export function OperationToast({ operation, onClose }: { operation: OperationState; onClose: () => void }) {
+  useEffect(() => {
+    if (operation.stage !== "confirmed") return
+    const timeout = window.setTimeout(onClose, CONFIRMED_TOAST_DURATION_MS)
+    return () => window.clearTimeout(timeout)
+  }, [onClose, operation.hash, operation.kind, operation.stage, operation.title])
+
   if (operation.stage === "idle") return null
   const busy = ["preparing", "encrypting", "signature", "pending"].includes(operation.stage)
   return (

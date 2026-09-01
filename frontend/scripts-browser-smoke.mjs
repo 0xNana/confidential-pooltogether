@@ -184,33 +184,89 @@ await page.screenshot({ path: "/tmp/confidential-pooltogether-landing-desktop.pn
 await page.click('[data-testid="launch-app"]')
 await page.waitForFunction(() => window.location.pathname === "/app", { timeout: 10_000 })
 await page.waitForSelector('[data-testid="shell-overview"]')
+await page.waitForSelector('[data-testid="shell-draws"]')
 await page.waitForSelector('[data-testid="connect-wallet"]')
+const shellOrder = await page.$$eval('.sidebar-nav [data-testid^="shell-"]', (items) => items.map((item) => item.textContent?.trim()))
+const expectedShellOrder = ["Overview", "Deposit", "Draws", "Withdraw", "Shield", "Unshield", "Send", "Earn", "Activity"]
+if (JSON.stringify(shellOrder) !== JSON.stringify(expectedShellOrder)) {
+  throw new Error(`Unexpected shell order: ${shellOrder.join(" → ")}`)
+}
+if (await page.$('[data-testid="shell-vaults"]')) {
+  throw new Error("Vaults is still rendered as a shell destination")
+}
 const appAccessibility = await page.accessibility.snapshot()
-if (!hasAccessibleNode(appAccessibility, "button", "Overview") || !hasAccessibleNode(appAccessibility, "button", "Wallet required")) {
+if (!hasAccessibleNode(appAccessibility, "button", "Overview") || !hasAccessibleNode(appAccessibility, "button", "Draws") || !hasAccessibleNode(appAccessibility, "button", "Deposit") || !hasAccessibleNode(appAccessibility, "button", "Wallet required")) {
   throw new Error("Vault accessibility tree is missing navigation or wallet controls")
 }
+if (await page.$('[data-testid="live-draw"]')) {
+  throw new Error("Live draw strip is still rendered on Overview")
+}
+if (await page.$('[data-testid="enter-draw"]')) {
+  await page.click('[data-testid="enter-draw"]')
+  await page.waitForFunction(() => document.querySelector('[data-testid="shell-deposit"]')?.getAttribute("aria-current") === "page")
+}
 await page.click('[data-testid="shell-deposit"]')
-await page.waitForSelector('[data-testid="live-draw"]')
-await waitForLiveState(page)
+await page.waitForFunction(() => !document.querySelector('[data-testid="live-draw"]'))
 
 await page.waitForSelector('[data-testid="submit-action"]')
+await page.waitForSelector('[data-testid="deposit-steps"]')
+const depositSteps = await page.$$eval('[data-testid="deposit-steps"] li', (steps) => steps.map((step) => step.textContent?.trim()))
+if (depositSteps.length !== 3 || !depositSteps.some((step) => step?.includes("Choose vault")) || !depositSteps.some((step) => step?.includes("Deposit privately"))) {
+  throw new Error("Deposit journey is missing its guided steps")
+}
+await page.waitForSelector('[data-testid="deposit-market-cusdc"]')
+const tokenLogosLoaded = await page.$$eval(".deposit-token-mark img", (logos) => logos.length === 2 && logos.every((logo) => logo.complete && logo.naturalWidth > 0))
+if (!tokenLogosLoaded) throw new Error("Deposit token logos did not load")
+const readinessText = await page.$eval(".deposit-readiness", (element) => element.textContent ?? "")
+if (readinessText.includes("Wallet") || readinessText.includes("Network") || readinessText.includes("Sepolia")) {
+  throw new Error("Deposit readiness repeats wallet or network status")
+}
+await page.click('[data-testid="deposit-market-cusdc"]')
+await page.waitForFunction(() => document.querySelector('[data-testid="deposit-market-cusdc"]')?.getAttribute("aria-pressed") === "true")
+const usdcText = await page.evaluate(() => document.body.textContent ?? "")
+if (!usdcText.includes("cUSDC")) throw new Error("cUSDC market did not become active from Deposit")
+
+await page.click('[data-testid="shell-draws"]')
+await page.waitForSelector('[data-testid="live-draw"]')
+await page.waitForSelector(".lifecycle-control")
+await page.waitForSelector(".prize-card")
+await waitForLiveState(page)
+await page.screenshot({ path: "/tmp/confidential-pooltogether-draws-desktop.png", fullPage: true })
+
+for (const view of ["overview", "deposit", "withdraw", "shield", "unshield", "send", "earn", "activity"]) {
+  await page.click(`[data-testid="shell-${view}"]`)
+  await page.waitForFunction(() => !document.querySelector('[data-testid="live-draw"]'))
+  if (view === "shield" || view === "unshield") {
+    await page.waitForSelector(`[data-testid="${view}-market-select"]`)
+    await page.select(`[data-testid="${view}-market-select"]`, "cUSDC")
+    await page.waitForFunction((selector) => document.querySelector(selector)?.value === "cUSDC", {}, `[data-testid="${view}-market-select"]`)
+  }
+  if (view === "withdraw" || view === "send") {
+    await page.waitForSelector(`[data-testid="${view}-market-select"]`)
+    await page.select(`[data-testid="${view}-market-select"]`, "cUSDC")
+    await page.waitForFunction((selector) => document.querySelector(selector)?.value === "cUSDC", {}, `[data-testid="${view}-market-select"]`)
+  }
+}
 
 await page.click('[data-testid="shell-overview"]')
-await page.waitForSelector('[data-testid="market-cusdc"]')
-await page.click('[data-testid="market-cusdc"]')
-await waitForLiveState(page)
-const usdcText = await page.evaluate(() => document.body.textContent ?? "")
-if (!usdcText.includes("cUSDC")) throw new Error("cUSDC market did not become active")
+if (await page.$(".lifecycle-control")) {
+  throw new Error("Permissionless draw action returned after navigating back to Overview")
+}
+const overviewHasVaultCatalog = await page.evaluate(() => Boolean(document.querySelector('[aria-labelledby="vaults-title"]')))
+if (overviewHasVaultCatalog) throw new Error("Vault catalog is still buried in Overview")
 await page.click('[data-testid="shell-activity"]')
 await page.waitForFunction(() => {
   const feed = document.querySelector('[data-testid="activity-feed"]')
   return Boolean(feed && feed.getAttribute("data-state") !== "loading")
 }, { timeout: 60_000 })
 if (await page.$(".read-error")) throw new Error("Activity fallback degraded the cUSDC market read")
-await page.click('[data-testid="shell-overview"]')
-await page.waitForSelector('[data-testid="market-cusdt"]')
-await page.click('[data-testid="market-cusdt"]')
+await page.click('[data-testid="shell-deposit"]')
+await page.waitForSelector('[data-testid="deposit-market-cusdt"]')
+await page.click('[data-testid="deposit-market-cusdt"]')
+await page.waitForFunction(() => document.querySelector('[data-testid="deposit-market-cusdt"]')?.getAttribute("aria-pressed") === "true")
+await page.click('[data-testid="shell-draws"]')
 await waitForLiveState(page)
+await page.click('[data-testid="shell-deposit"]')
 
 const appText = await page.evaluate(() => document.body.textContent ?? "")
 if (appText.includes("Demo wallet") || appText.includes("6,240.18")) throw new Error("Simulated wallet or prize data is still rendered")
@@ -245,10 +301,16 @@ const mobileLandingOverflow = await mobilePage.evaluate(() => document.documentE
 if (mobileLandingOverflow) throw new Error("Landing page has horizontal overflow at 390px")
 await mobilePage.screenshot({ path: "/tmp/confidential-pooltogether-landing-mobile.png", fullPage: true })
 await mobilePage.click('[data-testid="launch-app"]')
+await mobilePage.waitForSelector('[data-testid="shell-draws"]')
 await mobilePage.waitForSelector('[data-testid="shell-deposit"]')
-await mobilePage.click('[data-testid="shell-deposit"]')
+await mobilePage.click('[data-testid="shell-draws"]')
 await mobilePage.waitForSelector('[data-testid="live-draw"]')
 await waitForLiveState(mobilePage)
+const mobileDrawsOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+if (mobileDrawsOverflow) throw new Error("Draws has horizontal overflow at 390px")
+await mobilePage.screenshot({ path: "/tmp/confidential-pooltogether-draws-mobile.png", fullPage: true })
+await mobilePage.click('[data-testid="shell-deposit"]')
+await mobilePage.waitForFunction(() => !document.querySelector('[data-testid="live-draw"]'))
 const mobileVaultOverflow = await mobilePage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 if (mobileVaultOverflow) throw new Error("Vault has horizontal overflow at 390px")
 await mobilePage.screenshot({ path: "/tmp/confidential-pooltogether-production-mobile.png", fullPage: true })
@@ -264,7 +326,7 @@ if (narrowLandingOverflow) throw new Error("Landing page has horizontal overflow
 await narrowPage.goto(`${baseUrl}/app`, { waitUntil: "domcontentloaded", timeout: 30_000 })
 await narrowPage.waitForSelector('[data-testid="shell-deposit"]')
 await narrowPage.click('[data-testid="shell-deposit"]')
-await narrowPage.waitForSelector('[data-testid="live-draw"]')
+await narrowPage.waitForFunction(() => !document.querySelector('[data-testid="live-draw"]'))
 const narrowVaultOverflow = await narrowPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 if (narrowVaultOverflow) throw new Error("Vault has horizontal overflow at 320px")
 await narrowPage.close()

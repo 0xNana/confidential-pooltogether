@@ -6,7 +6,7 @@ import { formatTokenAmount } from "../lib/fhevm"
 
 type VaultActionProps = Pick<
   ConfidentialPoolTogetherModel,
-  "account" | "activeMarket" | "correctChain" | "isOperator" | "walletBalance" | "principal" | "operation" | "approveOperator" | "transact"
+  "account" | "activeMarket" | "markets" | "selectMarket" | "correctChain" | "isOperator" | "walletBalance" | "principal" | "operation" | "approveOperator" | "transact"
 >
 
 type Mode = "deposit" | "withdraw"
@@ -42,6 +42,7 @@ export function VaultAction({ mode, ...props }: VaultActionProps & { mode: Mode 
         <div className="action-heading">
           <div><p className="eyebrow">{mode === "deposit" ? "In this vault" : "Your balance"}</p><h2 id="vault-action-title">{mode === "deposit" ? "Deposit" : "Withdraw"}</h2></div>
         </div>
+        {mode === "withdraw" && <div className="token-market-switch" aria-label="Choose token"><label htmlFor="withdraw-market-select">Token</label><select id="withdraw-market-select" value={props.activeMarket.id} onChange={(event) => props.selectMarket(event.target.value as keyof typeof props.markets)} disabled={actionBusy} data-testid="withdraw-market-select">{Object.values(props.markets).map((market) => <option key={market.id} value={market.id}>{market.tokenSymbol}</option>)}</select></div>}
 
         <p className="action-copy">{mode === "deposit" ? `Add ${props.activeMarket.tokenSymbol} to this vault to join the draw.` : `Take your ${props.activeMarket.tokenSymbol} back out anytime.`}</p>
 
