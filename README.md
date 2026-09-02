@@ -1,9 +1,42 @@
 # Confidential PoolTogether
 
-Confidential PoolTogether is a no-loss prize savings prototype built with Zama FHEVM. Users deposit confidential stablecoins, keep access to their principal, and enter weighted prize draws without publishing deposit amounts, balances, odds, winner identity, or prize amounts.
+<p align="center"><strong>Save privately. Win onchain.</strong></p>
 
-- [Live app](https://confidential-pt.vercel.app/)
-- [Video pitch](https://www.youtube.com/watch?v=c__S5cpBYiI)
+<p align="center">
+  <a href="https://confidential-pt.vercel.app/"><strong>Launch app</strong></a>
+  ·
+  <a href="https://www.youtube.com/watch?v=c__S5cpBYiI"><strong>Watch video pitch</strong></a>
+  ·
+  <a href="docs/README.md"><strong>Documentation</strong></a>
+</p>
+
+<p align="center">
+  <a href="CONTRIBUTING.md">Contributing</a>
+  ·
+  <a href="CODE_OF_CONDUCT.md">Code of conduct</a>
+  ·
+  <a href="SECURITY.md">Security</a>
+  ·
+  <a href="LICENSE">License</a>
+</p>
+
+<p align="center">
+  <img alt="Zama FHEVM" src="https://img.shields.io/badge/Zama-FHEVM-DFFF00?style=flat-square&amp;labelColor=111111">
+  <img alt="Solidity 0.8.28" src="https://img.shields.io/badge/Solidity-0.8.28-363636?style=flat-square&amp;logo=solidity">
+  <img alt="React 19" src="https://img.shields.io/badge/React-19-20232A?style=flat-square&amp;logo=react&amp;logoColor=61DAFB">
+  <img alt="TypeScript 5.7" src="https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&amp;logo=typescript&amp;logoColor=white">
+  <img alt="Vite 6" src="https://img.shields.io/badge/Vite-6-646CFF?style=flat-square&amp;logo=vite&amp;logoColor=white">
+  <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Event_index-3FCF8E?style=flat-square&amp;logo=supabase&amp;logoColor=white">
+  <img alt="Sepolia" src="https://img.shields.io/badge/Network-Sepolia-627EEA?style=flat-square&amp;logo=ethereum&amp;logoColor=white">
+</p>
+
+<p align="center">
+  <a href="https://confidential-pt.vercel.app/">
+    <img src="docs/assets/confidential-pooltogether-hero.png" alt="Confidential PoolTogether — save privately, win onchain" width="100%">
+  </a>
+</p>
+
+Confidential PoolTogether is a no-loss prize savings prototype built with Zama FHEVM. Users deposit confidential stablecoins, keep access to their principal, and enter weighted prize draws without publishing deposit amounts, balances, odds, winner identity, or prize amounts.
 
 The repository is configured for two markets:
 
@@ -277,3 +310,11 @@ The Liquidity Hunt reward vault is a testnet APY simulator. It checkpoints encry
 The winner-selection implementation is intentionally bounded and supports at most 256 entrants per draw. Enrollment is draw-scoped, so a full historical draw cannot block a newer draw. Aggregate principal and prize custody are confidentially capped before inbound ERC-7984 transfers to prevent `euint64` wraparound.
 
 The continuous-draw contracts are a breaking migration. The active manifests reference the verified replacement pools and capacity-aware reward vaults above. Earlier Sepolia addresses remain historical evidence and must not be treated as compatible with the new ABI.
+
+## Contributing and Security
+
+Contributions are welcome. Read the [contribution guidelines](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before opening a pull request. Report suspected vulnerabilities privately by following the [security policy](SECURITY.md).
+
+## License
+
+This project is available under the [BSD 3-Clause Clear License](LICENSE).
