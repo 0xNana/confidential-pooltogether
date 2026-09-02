@@ -2,6 +2,9 @@
 
 Confidential PoolTogether is a no-loss prize savings prototype built with Zama FHEVM. Users deposit confidential stablecoins, keep access to their principal, and enter weighted prize draws without publishing deposit amounts, balances, odds, winner identity, or prize amounts.
 
+- [Live app](https://confidential-pt.vercel.app/)
+- [Video pitch](https://www.youtube.com/watch?v=c__S5cpBYiI)
+
 The repository is configured for two markets:
 
 - `cUSDT`
